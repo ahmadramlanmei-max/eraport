@@ -3025,7 +3025,17 @@
       ).sort((a, b) => indexMapel(a.Mata_Pelajaran) - indexMapel(b.Mata_Pelajaran));
       const nKoko = (state.db.nilaiKoko || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester));
       const nEkstra = (state.db.nilaiEkstra || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester));
-      const catatan = (state.db.catatanWali || []).find(x => x.NISN == nisn && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester)) || {Catatan:'', Kenaikan_Kelas:''};
+      // Utamakan catatan pada semester aktif. Jika belum ada keputusan di semester aktif,
+      // cari keputusan Lulus pada tahun ajaran yang sama agar tetap terbaca saat mencetak rapor.
+      const catatanWaliSiswa = (state.db.catatanWali || []).filter(x =>
+        String(x.NISN).trim() === String(nisn).trim() &&
+        (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran)
+      );
+      const catatan = catatanWaliSiswa.find(x =>
+        x.Semester == state.filter.sm || !x.Semester
+      ) || catatanWaliSiswa.find(x =>
+        String(x.Kenaikan_Kelas || '').trim().toLowerCase() === 'lulus'
+      ) || {Catatan:'', Kenaikan_Kelas:''};
       const kHadir = (state.db.kehadiran || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester));
       
       let sakit=0, izin=0, alpa=0;
@@ -3170,9 +3180,11 @@
             <div style="border: 1px solid black; min-height: 80px;"></div>
           </div>
 
-          ${isGenap ? `<div style="page-break-inside: avoid; margin-top: 15px; border: 1px solid black; padding: 10px; font-size: 11pt;">
-            <b>Keterangan Kenaikan Kelas:</b><br><br>
-            Berdasarkan pencapaian seluruh kompetensi, peserta didik dinyatakan: <br>
+          ${(isGenap || String(catatan.Kenaikan_Kelas || '').trim().toLowerCase() === 'lulus') ? `<div style="page-break-inside: avoid; margin-top: 15px; border: 1px solid black; padding: 10px; font-size: 11pt;">
+            <b>${String(catatan.Kenaikan_Kelas || '').trim().toLowerCase() === 'lulus' ? 'KETERANGAN KELULUSAN' : 'KETERANGAN KENAIKAN KELAS'}:</b><br><br>
+            ${String(catatan.Kenaikan_Kelas || '').trim().toLowerCase() === 'lulus'
+              ? 'Berdasarkan pencapaian seluruh kompetensi, peserta didik dinyatakan:'
+              : 'Berdasarkan pencapaian seluruh kompetensi, peserta didik dinyatakan:'}<br>
             <span style="font-weight: bold; font-size: 12pt;">${catatan.Kenaikan_Kelas || '...................................................'}</span>
           </div>` : ''}
 
