@@ -3031,11 +3031,36 @@
         String(x.NISN).trim() === String(nisn).trim() &&
         (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran)
       );
-      const catatan = catatanWaliSiswa.find(x =>
-        x.Semester == state.filter.sm || !x.Semester
-      ) || catatanWaliSiswa.find(x =>
-        String(x.Kenaikan_Kelas || '').trim().toLowerCase() === 'lulus'
-      ) || {Catatan:'', Kenaikan_Kelas:''};
+      // Pisahkan pencarian catatan semester aktif dan keputusan kelulusan.
+      // Baris semester aktif yang catatan keputusannya kosong tidak boleh menutupi
+      // baris lain yang sudah berisi keputusan "Lulus".
+      const catatanSemesterAktif = catatanWaliSiswa.find(x =>
+        String(x.Semester || '').trim().toLowerCase() === String(state.filter.sm || '').trim().toLowerCase()
+      ) || catatanWaliSiswa.find(x => !String(x.Semester || '').trim());
+
+      const ambilKeputusan = x =>
+        String(x.Kenaikan_Kelas ?? x['Kenaikan Kelas'] ?? x.KenaikanKelas ?? '').trim();
+
+      // Jika ada beberapa baris untuk siswa/tahun ajaran yang sama,
+      // prioritaskan keputusan Lulus agar tidak tertimpa keputusan/baris lama.
+      const keputusanTersimpan = catatanWaliSiswa.find(x =>
+        ambilKeputusan(x).toLowerCase() === 'lulus'
+      ) || catatanWaliSiswa.find(x => ambilKeputusan(x) !== '');
+
+      const keputusanFinal = catatanSemesterAktif
+        ? (catatanSemesterAktif.Kenaikan_Kelas ?? catatanSemesterAktif['Kenaikan Kelas'] ?? catatanSemesterAktif.KenaikanKelas ?? '')
+        : '';
+
+      const keputusanFallback = keputusanTersimpan
+        ? (keputusanTersimpan.Kenaikan_Kelas ?? keputusanTersimpan['Kenaikan Kelas'] ?? keputusanTersimpan.KenaikanKelas ?? '')
+        : '';
+
+      const catatan = {
+        ...(catatanSemesterAktif || keputusanTersimpan || {}),
+        Catatan: (catatanSemesterAktif && catatanSemesterAktif.Catatan) ||
+                 (keputusanTersimpan && keputusanTersimpan.Catatan) || '',
+        Kenaikan_Kelas: String(keputusanFinal).trim() ? keputusanFinal : keputusanFallback
+      };
       const kHadir = (state.db.kehadiran || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester));
       
       let sakit=0, izin=0, alpa=0;
