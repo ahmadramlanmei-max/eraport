@@ -3137,39 +3137,59 @@
       const nEkstra = (state.db.nilaiEkstra || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester));
       // Utamakan catatan pada semester aktif. Jika belum ada keputusan di semester aktif,
       // cari keputusan Lulus pada tahun ajaran yang sama agar tetap terbaca saat mencetak rapor.
-      const catatanWaliSiswa = (state.db.catatanWali || []).filter(x =>
-        String(x.NISN).trim() === String(nisn).trim() &&
-        (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran)
-      );
-      // Pisahkan pencarian catatan semester aktif dan keputusan kelulusan.
-      // Baris semester aktif yang catatan keputusannya kosong tidak boleh menutupi
-      // baris lain yang sudah berisi keputusan "Lulus".
-      const catatanSemesterAktif = catatanWaliSiswa.find(x =>
-        String(x.Semester || '').trim().toLowerCase() === String(state.filter.sm || '').trim().toLowerCase()
-      ) || catatanWaliSiswa.find(x => !String(x.Semester || '').trim());
+      const normalisasiKunciCatatan = value =>
+        String(value == null ? '' : value).trim().toLowerCase().replace(/\\s+/g, '').replace(/[‐‑‒–—]/g, '-');
 
       const ambilKeputusan = x =>
-        String(x.Kenaikan_Kelas ?? x['Kenaikan Kelas'] ?? x.KenaikanKelas ?? '').trim();
+        String(
+          x.Kenaikan_Kelas ??
+          x['Kenaikan Kelas'] ??
+          x.KenaikanKelas ??
+          x.Keputusan ??
+          x.Status_Kenaikan ??
+          ''
+        ).trim();
 
-      // Jika ada beberapa baris untuk siswa/tahun ajaran yang sama,
-      // prioritaskan keputusan Lulus agar tidak tertimpa keputusan/baris lama.
-      const keputusanTersimpan = catatanWaliSiswa.find(x =>
-        ambilKeputusan(x).toLowerCase() === 'lulus'
-      ) || catatanWaliSiswa.find(x => ambilKeputusan(x) !== '');
+      // Ambil semua catatan milik siswa pada tahun ajaran yang sedang dicetak.
+      // Pencocokan dinormalisasi agar spasi/format header lama tidak menggagalkan pembacaan.
+      const catatanWaliSiswa = (state.db.catatanWali || []).filter(x =>
+        normalisasiKunciCatatan(x.NISN) === normalisasiKunciCatatan(nisn) &&
+        (
+          normalisasiKunciCatatan(x.Tahun_Ajaran) === normalisasiKunciCatatan(state.filter.ta) ||
+          !normalisasiKunciCatatan(x.Tahun_Ajaran)
+        )
+      );
 
-      const keputusanFinal = catatanSemesterAktif
-        ? (catatanSemesterAktif.Kenaikan_Kelas ?? catatanSemesterAktif['Kenaikan Kelas'] ?? catatanSemesterAktif.KenaikanKelas ?? '')
-        : '';
+      const semesterAktifNorm = normalisasiKunciCatatan(state.filter.sm);
+      const catatanSemester = catatanWaliSiswa.filter(x =>
+        normalisasiKunciCatatan(x.Semester) === semesterAktifNorm
+      );
+      const catatanSemesterAktif =
+        [...catatanSemester].reverse().find(x => String(x.Catatan || '').trim() || ambilKeputusan(x)) ||
+        catatanSemester[catatanSemester.length - 1] ||
+        [...catatanWaliSiswa].reverse().find(x => !normalisasiKunciCatatan(x.Semester) && (String(x.Catatan || '').trim() || ambilKeputusan(x))) ||
+        {};
 
-      const keputusanFallback = keputusanTersimpan
-        ? (keputusanTersimpan.Kenaikan_Kelas ?? keputusanTersimpan['Kenaikan Kelas'] ?? keputusanTersimpan.KenaikanKelas ?? '')
-        : '';
+      // Keputusan LULUS menjadi prioritas tertinggi pada tahun ajaran yang sama,
+      // termasuk bila terdapat baris lama/duplikat atau perbedaan nama header kolom.
+      const keputusanLulus = [...catatanWaliSiswa].reverse().find(x =>
+        normalisasiKunciCatatan(ambilKeputusan(x)) === 'lulus'
+      );
+      const keputusanSemester = [...catatanSemester].reverse().find(x => ambilKeputusan(x));
+      const keputusanLain = [...catatanWaliSiswa].reverse().find(x => ambilKeputusan(x));
+
+      const keputusanFinal = keputusanLulus
+        ? ambilKeputusan(keputusanLulus)
+        : (keputusanSemester ? ambilKeputusan(keputusanSemester) : (keputusanLain ? ambilKeputusan(keputusanLain) : ''));
 
       const catatan = {
-        ...(catatanSemesterAktif || keputusanTersimpan || {}),
-        Catatan: (catatanSemesterAktif && catatanSemesterAktif.Catatan) ||
-                 (keputusanTersimpan && keputusanTersimpan.Catatan) || '',
-        Kenaikan_Kelas: String(keputusanFinal).trim() ? keputusanFinal : keputusanFallback
+        ...(catatanSemesterAktif || keputusanLulus || keputusanSemester || keputusanLain || {}),
+        Catatan:
+          (catatanSemesterAktif && catatanSemesterAktif.Catatan) ||
+          (keputusanLulus && keputusanLulus.Catatan) ||
+          (keputusanSemester && keputusanSemester.Catatan) ||
+          (keputusanLain && keputusanLain.Catatan) || '',
+        Kenaikan_Kelas: keputusanFinal
       };
       const kHadir = (state.db.kehadiran || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester));
       
