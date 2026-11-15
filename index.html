@@ -2217,7 +2217,12 @@
       return String(value == null ? '' : value).trim().toLowerCase();
     }
 
-    function renderCatatan(container) {
+    
+    function normalisasiNISNFront(value) {
+      const digit = String(value == null ? '' : value).replace(/\D/g, '');
+      return digit ? digit.padStart(10, '0') : '';
+    }
+function renderCatatan(container) {
       const taAktif = String(state.filter.ta || '').trim();
       const smAktif = String(state.filter.sm || '').trim();
       const isGenap = normSemesterCatatan(smAktif) === 'genap';
@@ -2235,7 +2240,7 @@
       // tetapi hanya dipakai jika belum ada catatan pada semester yang dipilih.
       const cariCatatanSiswa = nisn => {
         const milikSiswa = catatanSemua.filter(x =>
-          norm(x.NISN) === norm(nisn) &&
+          normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) &&
           norm(x.Tahun_Ajaran) === norm(taAktif)
         );
 
@@ -3138,7 +3143,7 @@
       // Utamakan catatan pada semester aktif. Jika belum ada keputusan di semester aktif,
       // cari keputusan Lulus pada tahun ajaran yang sama agar tetap terbaca saat mencetak rapor.
       const normalisasiKunciCatatan = value =>
-        String(value == null ? '' : value).trim().toLowerCase().replace(/\\s+/g, '').replace(/[‐‑‒–—]/g, '-');
+        String(value == null ? '' : value).trim().toLowerCase().replace(/\s+/g, '').replace(/[‐‑‒–—]/g, '-');
 
       const ambilKeputusan = x =>
         String(
@@ -3153,7 +3158,7 @@
       // Ambil semua catatan milik siswa pada tahun ajaran yang sedang dicetak.
       // Pencocokan dinormalisasi agar spasi/format header lama tidak menggagalkan pembacaan.
       const catatanWaliSiswa = (state.db.catatanWali || []).filter(x =>
-        normalisasiKunciCatatan(x.NISN) === normalisasiKunciCatatan(nisn) &&
+        normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) &&
         (
           normalisasiKunciCatatan(x.Tahun_Ajaran) === normalisasiKunciCatatan(state.filter.ta) ||
           !normalisasiKunciCatatan(x.Tahun_Ajaran)
