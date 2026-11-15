@@ -3194,6 +3194,25 @@
           </tbody>
         </table>
       `;
+
+      // Tampilkan area rapor dan jalankan dialog cetak browser.
+      const pa = document.getElementById('print-area');
+      if (!pa) {
+        alert('Area cetak tidak ditemukan. Muat ulang aplikasi dan coba kembali.');
+        return;
+      }
+      pa.innerHTML = printHTML;
+      pa.classList.remove('hidden');
+      pa.classList.add('raport-repeat-print');
+
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+          pa.classList.add('hidden');
+          pa.classList.remove('raport-repeat-print');
+          pa.innerHTML = '';
+        }, 3000);
+      }, 500);
     }
   </script>
 
