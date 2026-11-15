@@ -2355,6 +2355,27 @@
              <div class="bg-amber-100 p-2.5 rounded-xl text-amber-600"><i class="fas fa-level-up-alt text-xl"></i></div>
              <h2 class="text-xl font-extrabold text-slate-800 tracking-tight">Eksekusi Kenaikan Kelas (Tutup Tahun)</h2>
           </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 max-w-5xl mx-auto mb-8 fade-in">
+          <div class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+             <div class="bg-rose-100 p-2.5 rounded-xl text-rose-600"><i class="fas fa-archive text-xl"></i></div>
+             <h2 class="text-xl font-extrabold text-slate-800 tracking-tight">Arsip Data Akademik (Kosongkan Memori)</h2>
+          </div>
+          <div class="bg-rose-50/70 p-4 rounded-xl border border-rose-100 text-sm text-rose-800 mb-6 font-semibold flex gap-3 items-start">
+             <i class="fas fa-info-circle mt-0.5 text-rose-500"></i>
+             <p>Pindahkan data Nilai, Kehadiran, dan Catatan dari <b>Tahun Ajaran lama</b> ke Sheet Arsip. Proses cut-paste ini akan mempercepat waktu loading (sinkronisasi) aplikasi ke depannya tanpa menghilangkan data historis di Google Sheets.</p>
+          </div>
+          <div class="flex flex-wrap gap-4 items-end">
+             <div class="flex-1 min-w-[200px]">
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Tahun Ajaran Yang Akan Diarsipkan</label>
+                <input type="text" id="input-ta-arsip" placeholder="Cth: 2025/2026" class="w-full border border-slate-300 px-3 py-2.5 rounded-lg outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100 font-medium bg-white">
+             </div>
+             <div>
+                <button type="button" onclick="prosesArsipData()" class="bg-rose-600 text-white font-bold px-6 py-2.5 rounded-lg hover:bg-rose-700 shadow-md transition-all flex items-center gap-2">
+                   <i class="fas fa-file-archive"></i> Eksekusi Arsip
+                </button>
+             </div>
+          </div>
+        </div>
           <div class="bg-amber-50/70 p-4 rounded-xl border border-amber-100 text-sm text-amber-800 mb-6 font-semibold flex gap-3 items-start">
              <i class="fas fa-exclamation-triangle mt-0.5 text-amber-500"></i>
              <p>Aksi ini membaca keputusan wali kelas di semester <b>Genap</b>. Siswa dengan status 'Naik Kelas' akan otomatis naik tingkat (misal: VII-A menjadi VIII-A). Pastikan semua wali kelas sudah menyimpan keputusan kenaikan kelas!</p>
@@ -2478,6 +2499,25 @@
         showLoading(false);
         showToast("Koneksi gagal: " + (err.message || 'Error Server'), true);
       }).prosesRolloverKenaikan(state.filter.ta, taBaru);
+    }
+    function prosesArsipData() {
+      const taArsip = document.getElementById('input-ta-arsip').value.trim();
+      if(!taArsip) return showToast("Tahun Ajaran yang akan diarsipkan harus diisi!", true);
+
+      if(!confirm(`PERINGATAN CUT-PASTE: Seluruh data akademik (Nilai Intra, P5, Ekstra, Kehadiran) pada Tahun Ajaran ${taArsip} akan dipindahkan ke tab Arsip. Loading aplikasi akan menjadi lebih ringan. Lanjutkan?`)) return;
+
+      showLoading(true, "Memindahkan data ke Sheet Arsip...");
+      
+      google.script.run.withSuccessHandler(res => {
+        showLoading(false);
+        showToast(res.message, !res.success);
+        if(res.success) {
+           setTimeout(() => fetchData(true), 1500); // Tarik ulang data bersih
+        }
+      }).withFailureHandler(err => {
+        showLoading(false);
+        showToast("Koneksi gagal: " + (err.message || 'Error Server'), true);
+      }).arsipDataTahunLama(taArsip);
     }
     function editWali(u, n, nip, mapel = '', kelas = '') { 
       document.getElementById('g-uname').value = u; 
