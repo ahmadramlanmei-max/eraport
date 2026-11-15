@@ -2328,6 +2328,59 @@
         </div>`;
     }
 
+    // Menyimpan catatan wali kelas untuk periode aktif.
+    // Fungsi ini dipisahkan dari renderCatatan agar tombol Simpan Catatan
+    // selalu memanggil fungsi global yang tersedia.
+    function simpanCatatan() {
+      const tabel = document.querySelector('#table-catatan tbody');
+      if (!tabel) {
+        showToast('Tabel Catatan Wali Kelas tidak ditemukan. Muat ulang halaman.', true);
+        return;
+      }
+
+      const baris = Array.from(tabel.querySelectorAll('tr[data-nisn]'));
+      if (!baris.length) {
+        showToast('Tidak ada data siswa yang dapat disimpan.', true);
+        return;
+      }
+
+      const payload = baris.map(tr => {
+        const inputCatatan = tr.querySelector('.val-catatan');
+        const inputKeputusan = tr.querySelector('.val-kenaikan');
+        return {
+          NISN: tr.getAttribute('data-nisn') || '',
+          Tahun_Ajaran: String(state.filter.ta || '').trim(),
+          Semester: String(state.filter.sm || '').trim(),
+          Catatan: inputCatatan ? inputCatatan.value.trim() : '',
+          Kenaikan_Kelas: inputKeputusan ? inputKeputusan.value : ''
+        };
+      }).filter(x => x.NISN);
+
+      if (!payload.length) {
+        showToast('Tidak ada data siswa yang valid untuk disimpan.', true);
+        return;
+      }
+
+      showLoading(true, 'Menyimpan Catatan Wali Kelas...');
+      google.script.run
+        .withSuccessHandler(res => {
+          showLoading(false);
+          if (res && res.success) {
+            showToast(res.message || 'Catatan Wali Kelas berhasil disimpan.');
+            // Tarik ulang data dari Spreadsheet agar status dan isi catatan
+            // yang tampil benar-benar mencerminkan data tersimpan.
+            fetchData(true);
+          } else {
+            showToast((res && res.message) || 'Catatan gagal disimpan.', true);
+          }
+        })
+        .withFailureHandler(err => {
+          showLoading(false);
+          showToast('Gagal menyimpan catatan: ' + ((err && err.message) || 'Kesalahan server.'), true);
+        })
+        .simpanBatchData('CatatanWali', payload, ['NISN', 'Tahun_Ajaran', 'Semester']);
+    }
+
     function renderPengaturan(container) {
       if(String(state.user.role).trim().toLowerCase() !== 'admin') {
          return container.innerHTML = `<div class="p-6 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl shadow-sm font-bold flex items-center gap-3"><i class="fas fa-lock text-rose-500 text-xl"></i> Akses ditolak. Halaman khusus Administrator.</div>`;
