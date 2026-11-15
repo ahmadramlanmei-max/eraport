@@ -2213,26 +2213,87 @@
       }).simpanBatchData(sheetName, payload, keys);
     }
 
+    function normSemesterCatatan(value) {
+      return String(value == null ? '' : value).trim().toLowerCase();
+    }
+
     function renderCatatan(container) {
-      let isGenap = (String(state.filter.sm || '').trim().toLowerCase() === 'genap');
-      let rows = state.db.siswa.map((s, i) => {
-        let rec = (state.db.catatanWali||[]).find(x => x.NISN == s.NISN && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester)) || {Catatan:'', Kenaikan_Kelas:''};
+      const taAktif = String(state.filter.ta || '').trim();
+      const smAktif = String(state.filter.sm || '').trim();
+      const isGenap = normSemesterCatatan(smAktif) === 'genap';
+
+      const norm = value => String(value == null ? '' : value)
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/[‐‑‒–—]/g, '-');
+
+      const catatanSemua = Array.isArray(state.db.catatanWali) ? state.db.catatanWali : [];
+
+      // Cari catatan berdasarkan NISN + Tahun Ajaran + Semester.
+      // Baris lama tanpa kolom Semester tetap dibaca sebagai data kompatibilitas,
+      // tetapi hanya dipakai jika belum ada catatan pada semester yang dipilih.
+      const cariCatatanSiswa = nisn => {
+        const milikSiswa = catatanSemua.filter(x =>
+          norm(x.NISN) === norm(nisn) &&
+          norm(x.Tahun_Ajaran) === norm(taAktif)
+        );
+
+        const tepatSemester = milikSiswa.filter(x =>
+          norm(x.Semester) === norm(smAktif)
+        );
+
+        const barisLama = milikSiswa.filter(x => !norm(x.Semester));
+        const kandidat = tepatSemester.length ? tepatSemester : barisLama;
+
+        // Jika ada baris ganda, pilih baris terakhir yang memiliki isi.
+        return [...kandidat].reverse().find(x =>
+          String(x.Catatan || '').trim() ||
+          String(x.Kenaikan_Kelas || x['Kenaikan Kelas'] || x.KenaikanKelas || '').trim()
+        ) || kandidat[kandidat.length - 1] || {Catatan:'', Kenaikan_Kelas:''};
+      };
+
+      const dataSiswa = Array.isArray(state.db.siswa) ? state.db.siswa : [];
+      const dataTampilan = dataSiswa.map(s => {
+        const rec = cariCatatanSiswa(s.NISN);
+        const catatan = String(rec.Catatan || '');
+        const keputusan = String(rec.Kenaikan_Kelas ?? rec['Kenaikan Kelas'] ?? rec.KenaikanKelas ?? '').trim();
+        return {s, rec, catatan, keputusan, sudah: !!catatan.trim()};
+      });
+
+      const jumlahSudah = dataTampilan.filter(x => x.sudah).length;
+      const jumlahBelum = dataTampilan.length - jumlahSudah;
+
+      const rows = dataTampilan.map((item, i) => {
+        const {s, catatan, keputusan, sudah} = item;
+        const nisnEsc = escapeHtml(s.NISN || '');
+        const namaEsc = escapeHtml(s.Nama_Lengkap || '');
+        const catatanEsc = escapeHtml(catatan);
+        const keputusanEsc = escapeHtml(keputusan);
+
         return `
-          <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors" data-nisn="${s.NISN}">
+          <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors ${sudah ? 'bg-emerald-50/30' : ''}" data-nisn="${nisnEsc}">
             <td class="py-4 px-4 text-center font-bold text-slate-500">${i + 1}</td>
-            <td class="py-4 px-4 font-bold text-slate-800">${s.Nama_Lengkap}</td>
-            <td class="py-4 px-4"><textarea class="val-catatan w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none" rows="2" placeholder="Contoh: Tingkatkan prestasimu belajar...">${rec.Catatan}</textarea></td>
+            <td class="py-4 px-4 font-bold text-slate-800">${namaEsc}</td>
+            <td class="py-4 px-4">
+              <textarea class="val-catatan w-full border ${sudah ? 'border-emerald-300' : 'border-slate-300'} rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none" rows="2" placeholder="Contoh: Tingkatkan prestasimu belajar...">${catatanEsc}</textarea>
+            </td>
             <td class="py-4 px-4 ${isGenap ? '' : 'hidden'}">
               <select class="val-kenaikan w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none bg-white font-medium">
-                <option value="" ${rec.Kenaikan_Kelas==''?'selected':''}>- Pilih Keputusan -</option>
-                <option value="Naik Kelas" ${rec.Kenaikan_Kelas=='Naik Kelas'?'selected':''}>Naik Kelas</option>
-                <option value="Tinggal Kelas" ${rec.Kenaikan_Kelas=='Tinggal Kelas'?'selected':''}>Tinggal Kelas</option>
-                <option value="Lulus" ${rec.Kenaikan_Kelas=='Lulus'?'selected':''}>Lulus</option>
+                <option value="" ${keputusan === '' ? 'selected' : ''}>- Pilih Keputusan -</option>
+                <option value="Naik Kelas" ${keputusan === 'Naik Kelas' ? 'selected' : ''}>Naik Kelas</option>
+                <option value="Tinggal Kelas" ${keputusan === 'Tinggal Kelas' ? 'selected' : ''}>Tinggal Kelas</option>
+                <option value="Lulus" ${keputusan === 'Lulus' ? 'selected' : ''}>Lulus</option>
               </select>
+            </td>
+            <td class="py-4 px-4 text-center">
+              ${sudah
+                ? '<span class="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1.5 rounded-lg text-xs font-extrabold"><i class="fas fa-check-circle"></i> Sudah dicatat</span>'
+                : '<span class="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1.5 rounded-lg text-xs font-extrabold"><i class="fas fa-clock"></i> Belum dicatat</span>'}
             </td>
           </tr>`;
       }).join('');
-      
+
       container.innerHTML = `
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden fade-in">
            <div class="p-6 border-b border-blue-100 bg-blue-50/50 flex flex-col sm:flex-row sm:items-center gap-4">
@@ -2240,35 +2301,31 @@
               <div>
                  <h2 class="font-bold text-blue-900 text-lg tracking-tight">Catatan Perkembangan Karakter & Akademik</h2>
                  <p class="text-sm text-blue-600 mt-1 font-medium">Catatan ini akan tampil di bagian bawah Raport Siswa.</p>
+                 <p class="text-xs text-slate-500 mt-1">Periode: <b>${escapeHtml(taAktif || '-')}</b> · Semester <b>${escapeHtml(smAktif || '-')}</b></p>
               </div>
+           </div>
+           <div class="px-5 py-3 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-3 items-center text-sm">
+              <span class="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg font-bold"><i class="fas fa-check-circle"></i> Sudah dicatat: ${jumlahSudah}</span>
+              <span class="inline-flex items-center gap-2 bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg font-bold"><i class="fas fa-clock"></i> Belum dicatat: ${jumlahBelum}</span>
            </div>
            <div class="overflow-x-auto w-full">
               <table class="w-full text-sm text-left" id="table-catatan">
                  <thead class="bg-slate-100 text-slate-600 uppercase text-xs font-extrabold border-b border-slate-200 tracking-wider">
                     <tr>
                        <th class="py-4 px-4 text-center w-12">No</th>
-                       <th class="py-4 px-4 w-1/4">Nama Siswa</th>
+                       <th class="py-4 px-4 w-1/5">Nama Siswa</th>
                        <th class="py-4 px-4">Catatan Wali Kelas</th>
                        <th class="py-4 px-4 w-40 ${isGenap ? '' : 'hidden'}">Keputusan</th>
+                       <th class="py-4 px-4 text-center w-36">Status Catatan</th>
                     </tr>
                  </thead>
-                 <tbody>${rows || '<tr><td colspan="4" class="text-center py-10 text-slate-400 font-medium">Belum ada siswa</td></tr>'}</tbody>
+                 <tbody>${rows || '<tr><td colspan="5" class="text-center py-10 text-slate-400 font-medium">Belum ada siswa</td></tr>'}</tbody>
               </table>
            </div>
            <div class="p-5 border-t border-slate-100 bg-slate-50/80 text-right">
               <button onclick="simpanCatatan()" class="bg-blue-600 text-white font-bold px-6 py-2.5 rounded-xl shadow-md hover:bg-blue-700 transition-all transform hover:-translate-y-0.5"><i class="fas fa-save mr-1.5"></i> Simpan Catatan</button>
            </div>
         </div>`;
-    }
-
-    function simpanCatatan() {
-      let payload = Array.from(document.querySelectorAll('#table-catatan tbody tr[data-nisn]')).map(tr => {
-        let ken = tr.querySelector('.val-kenaikan'); return { NISN: tr.getAttribute('data-nisn'), Tahun_Ajaran: state.filter.ta, Semester: state.filter.sm, Catatan: tr.querySelector('.val-catatan').value, Kenaikan_Kelas: ken ? ken.value : '' };
-      });
-      showLoading(true, "Menyimpan..."); 
-      google.script.run.withSuccessHandler(res => { 
-        showToast(res.message, !res.success); setTimeout(() => fetchData(true), 800); 
-      }).simpanBatchData('CatatanWali', payload, ['NISN', 'Tahun_Ajaran', 'Semester']);
     }
 
     function renderPengaturan(container) {
