@@ -2180,7 +2180,7 @@
         rows = siswaBolehDinilai.map((s, i) => `
         <tr class="border-b border-slate-100 tr-nilai-siswa hover:bg-slate-50 transition-colors" data-nisn="${s.NISN}" data-kelas="${s.ID_Kelas}">
            <td class="py-3 px-4 text-center font-bold text-slate-500 nr-urut">${i+1}</td>
-           <td class="py-3 px-4 font-bold text-slate-800">${s.Nama_Lengkap}</td>
+           <td class="py-3 px-4 font-bold text-slate-800">${s.Nama_Lengkap}<div class="status-nilai-terisi text-xs font-semibold mt-1 text-slate-400">Belum ada nilai tersimpan</div></td>
            <td class="py-3 px-4">
               <select class="val-capaian w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white font-medium outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
                 <option value="Berkembang">C (Berkembang)</option>
@@ -2227,7 +2227,7 @@
         rows = siswaBolehDinilai.map((s, i) => `
         <tr class="border-b border-slate-100 tr-nilai-siswa hover:bg-slate-50 transition-colors" data-nisn="${s.NISN}" data-kelas="${s.ID_Kelas}">
            <td class="py-3 px-4 text-center font-bold text-slate-500 nr-urut">${i+1}</td>
-           <td class="py-3 px-4 font-bold text-slate-800">${s.Nama_Lengkap}</td>
+           <td class="py-3 px-4 font-bold text-slate-800">${s.Nama_Lengkap}<div class="status-nilai-terisi text-xs font-semibold mt-1 text-slate-400">Belum ada nilai tersimpan</div></td>
            <td class="py-3 px-4">
               <select class="val-predikat w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white font-medium outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
                  <option value="Sangat Baik">Sangat Baik</option>
@@ -2288,13 +2288,34 @@
 
     function terapkanFilterKelompokP5() {
       const id=document.getElementById('input-kelompok-p5')?.value||'';
-      const g=(state.db.kelompokProjek||[]).find(x=>x.ID_Projek===id);
+      const g=(state.db.kelompokProjek||[]).find(x=>String(x.ID_Projek)===String(id));
       const d=document.getElementById('input-dimensi'),t=document.getElementById('input-tema');
       if(d)d.value=g?g.Dimensi_P5:'';
       if(t)t.value=g?g.Tema_Projek:'';
-      const members=new Set((state.db.kelompokProjek||[]).filter(x=>x.ID_Projek===id).map(x=>String(x.NISN)));
+      const members=new Set((state.db.kelompokProjek||[]).filter(x=>String(x.ID_Projek)===String(id)).map(x=>normalisasiNISNFront(x.NISN)));
       document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr=>{
-        tr.style.display=id&&members.has(String(tr.getAttribute('data-nisn')))?'':'none';
+        const nisn=normalisasiNISNFront(tr.getAttribute('data-nisn'));
+        const visible=!!id&&members.has(nisn);
+        tr.style.display=visible?'':'none';
+        const saved=(state.db.nilaiKoko||[]).find(x=>
+          normalisasiNISNFront(x.NISN)===nisn &&
+          String(x.Tahun_Ajaran||'')===String(state.filter.ta||'') &&
+          String(x.Semester||'')===String(state.filter.sm||'') &&
+          String(x.Dimensi_P5||'').trim()===String(g?.Dimensi_P5||'').trim() &&
+          String(x.Tema_Projek||'').trim()===String(g?.Tema_Projek||'').trim()
+        );
+        const capaian=tr.querySelector('.val-capaian');
+        const deskripsi=tr.querySelector('.val-desc');
+        const status=tr.querySelector('.status-nilai-terisi');
+        if(saved){
+          if(capaian)capaian.value=String(saved.Capaian||'Mahir');
+          if(deskripsi)deskripsi.value=saved.Deskripsi||'';
+          if(status){status.textContent='✓ Nilai sudah tersimpan — perubahan akan memperbarui nilai ini';status.className='status-nilai-terisi text-xs font-semibold mt-1 text-emerald-700';}
+        }else{
+          if(capaian)capaian.value='Mahir';
+          if(deskripsi)deskripsi.value='';
+          if(status){status.textContent='Belum ada nilai tersimpan';status.className='status-nilai-terisi text-xs font-semibold mt-1 text-slate-400';}
+        }
       });
     }
 
@@ -2318,9 +2339,29 @@
         String(x.ID_Kelas)===String(kelasId) &&
         String(x.Nama_Ekskul)===String(ekskul) &&
         String(x.Status||'Aktif')==='Aktif'
-      ).map(x=>String(x.NISN)));
+      ).map(x=>normalisasiNISNFront(x.NISN)));
       document.querySelectorAll('#tbl-nilai-ekstra tr[data-nisn]').forEach(tr=>{
-        tr.style.display=ekskul&&assigned.has(String(tr.getAttribute('data-nisn')))?'':'none';
+        const nisn=normalisasiNISNFront(tr.getAttribute('data-nisn'));
+        const visible=!!ekskul&&assigned.has(nisn);
+        tr.style.display=visible?'':'none';
+        const saved=(state.db.nilaiEkstra||[]).find(x=>
+          normalisasiNISNFront(x.NISN)===nisn &&
+          String(x.Tahun_Ajaran||'')===String(state.filter.ta||'') &&
+          String(x.Semester||'')===String(state.filter.sm||'') &&
+          String(x.Nama_Ekskul||'').trim()===String(ekskul).trim()
+        );
+        const predikat=tr.querySelector('.val-predikat');
+        const deskripsi=tr.querySelector('.val-desc');
+        const status=tr.querySelector('.status-nilai-terisi');
+        if(saved){
+          if(predikat)predikat.value=String(saved.Predikat||'Baik');
+          if(deskripsi)deskripsi.value=saved.Deskripsi||'';
+          if(status){status.textContent='✓ Nilai sudah tersimpan — perubahan akan memperbarui nilai ini';status.className='status-nilai-terisi text-xs font-semibold mt-1 text-emerald-700';}
+        }else{
+          if(predikat)predikat.value='Baik';
+          if(deskripsi)deskripsi.value='';
+          if(status){status.textContent='Belum ada nilai tersimpan';status.className='status-nilai-terisi text-xs font-semibold mt-1 text-slate-400';}
+        }
       });
     }
 
@@ -2442,6 +2483,9 @@
         keys = ['NISN', 'Nama_Ekskul', 'Tahun_Ajaran', 'Semester']; sheetName = 'NilaiEkstra';
       }
       if(payload.length === 0) return showToast("Tidak ada data untuk disimpan.", true);
+
+      // Nilai Koko dan Ekstra menggunakan kunci unik NISN + jenis kegiatan + periode.
+      // Backend simpanBatchData akan memperbarui baris yang cocok, bukan menambah baris baru.
 
       // Identitas akun pengisi selalu dikirim ke server agar validasi akses
       // tidak dapat dilewati hanya dengan mengubah pilihan mapel di browser.
