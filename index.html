@@ -926,7 +926,7 @@
       const opsiDimensi = '<option value="">-- Pilih Dimensi --</option>' + (state.db.dimensiP5||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()!=='nonaktif').map(x=>`<option value="${escapeHtml(x.Dimensi)}">${escapeHtml(x.Dimensi)}</option>`).join('');
       const opsiTema = '<option value="">-- Pilih Tema --</option>' + (state.db.temaProjek||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()!=='nonaktif').map(x=>`<option value="${escapeHtml(x.Tema_Projek)}">${escapeHtml(x.Tema_Projek)}</option>`).join('');
       const opsiEkstra = (state.db.masterEkstra||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()!=='nonaktif').map(x=>`<option value="${escapeHtml(x.Nama_Ekskul)}">${escapeHtml(x.Nama_Ekskul)}</option>`).join('');
-      const mapel = ['Pendidikan Agama dan Budi Pekerti','Pendidikan Pancasila','Bahasa Indonesia','Matematika','Ilmu Pengetahuan Alam (IPA)','Ilmu Pengetahuan Sosial (IPS)','Bahasa Inggris','Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)','Informatika','Seni Budaya','Prakarya','Muatan Lokal','Koding dan Kecerdasan Artifisial (KKA)'];
+      const mapel = (state.db.masterMapel||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()==='aktif').sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999)).map(x=>String(x.Nama_Mapel||'').trim()).filter(Boolean);
       const tblIntra=(state.db.pemetaanIntra||[]).filter(x=>x.Tahun_Ajaran===ta&&x.Semester===sm).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml((kelas.find(k=>k.ID_Kelas===x.ID_Kelas)||{}).Nama_Kelas||x.ID_Kelas)}</td><td class="p-2">${escapeHtml(x.Mata_Pelajaran)}</td></tr>`).join('');
       const tblDim=(state.db.dimensiP5||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Dimensi)}</td></tr>`).join('');
       const tblTema=(state.db.temaProjek||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Tema_Projek)}</td></tr>`).join('');
@@ -939,6 +939,20 @@
           <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-5">
             <h3 class="font-extrabold text-indigo-900 text-lg">Pemetaan Akademik</h3>
             <p class="text-sm text-indigo-700 mt-1">Periode aktif: <b>${escapeHtml(ta)}</b> · Semester <b>${escapeHtml(sm)}</b>. Pemetaan baru disimpan pada sheet terpisah dan tidak menghapus nilai yang sudah ada.</p>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div><h3 class="font-bold text-slate-800"><i class="fas fa-book-open text-indigo-600 mr-2"></i>Master Mata Pelajaran</h3>
+              <p class="text-xs text-slate-500 mt-1">Tambah, edit, atur urutan, atau nonaktifkan mata pelajaran. Daftar ini digunakan pada Input Nilai dan Pemetaan Intrakurikuler.</p></div>
+            </div>
+            <div class="grid md:grid-cols-[1fr_120px_auto] gap-2">
+              <input id="master-mapel-nama" class="border rounded-lg p-2" placeholder="Nama mata pelajaran baru">
+              <input id="master-mapel-urutan" type="number" min="1" class="border rounded-lg p-2" placeholder="Urutan">
+              <button onclick="simpanMasterMapel()" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 font-bold"><i class="fas fa-plus mr-1"></i>Tambah Mapel</button>
+            </div>
+            <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-2 text-left">Urutan</th><th class="p-2 text-left">Mata Pelajaran</th><th class="p-2 text-left">Status</th><th class="p-2 text-right">Aksi</th></tr></thead><tbody>
+              ${(state.db.masterMapel||[]).slice().sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999)).map(x=>`<tr class="border-b"><td class="p-2">${escapeHtml(x.Urutan||'-')}</td><td class="p-2 font-medium">${escapeHtml(x.Nama_Mapel||'')}</td><td class="p-2">${String(x.Status||'Aktif').toLowerCase()==='aktif'?'Aktif':'Nonaktif'}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editMasterMapel('${escapeHtml(x.ID_Mapel)}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="ubahStatusMasterMapel('${escapeHtml(x.ID_Mapel)}','${String(x.Status||'Aktif').toLowerCase()==='aktif'?'nonaktifkan':'aktifkan'}')" class="text-rose-600 font-bold px-2">${String(x.Status||'Aktif').toLowerCase()==='aktif'?'Nonaktifkan':'Aktifkan'}</button></td></tr>`).join('')||'<tr><td colspan="4" class="p-3 text-center text-slate-400">Belum ada mata pelajaran.</td></tr>'}
+            </tbody></table></div>
           </div>
           <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
             <h3 class="font-bold text-slate-800"><i class="fas fa-book text-blue-600 mr-2"></i>1. Pemetaan Intrakurikuler</h3>
@@ -1006,6 +1020,50 @@
       if(!el) return;
       const daftar=(state.db.siswa||[]).filter(s=>String(s.ID_Kelas)===String(id));
       el.innerHTML='<option value="">-- Pilih Siswa --</option>'+daftar.map(s=>`<option value="${escapeHtml(s.NISN)}">${escapeHtml(s.Nama_Lengkap)} (${escapeHtml(s.NISN)})</option>`).join('');
+    }
+
+    function simpanMasterMapel() {
+      const namaEl=document.getElementById('master-mapel-nama');
+      const urutanEl=document.getElementById('master-mapel-urutan');
+      const nama=String(namaEl && namaEl.value || '').trim();
+      const urutan=Number(urutanEl && urutanEl.value || 0);
+      if(!nama) return showToast('Nama mata pelajaran wajib diisi.',true);
+      showLoading(true,'Menyimpan master mata pelajaran...');
+      google.script.run.withSuccessHandler(res=>{
+        showLoading(false);
+        if(res && res.success){ showToast(res.message||'Mapel berhasil disimpan.'); fetchData(true); }
+        else showToast((res&&res.message)||'Gagal menyimpan mapel.',true);
+      }).withFailureHandler(err=>{showLoading(false);showToast('Gagal menyimpan mapel: '+(err.message||'Error server'),true);})
+        .simpanPemetaanAkademik('mapelMaster',{Nama_Mapel:nama,Urutan:urutan,Aksi:'tambah'},state.user.username);
+    }
+
+    function editMasterMapel(id) {
+      const item=(state.db.masterMapel||[]).find(x=>String(x.ID_Mapel)===String(id));
+      if(!item) return;
+      const nama=prompt('Ubah nama mata pelajaran:',item.Nama_Mapel||'');
+      if(nama===null) return;
+      const urutan=prompt('Nomor urutan mata pelajaran:',item.Urutan||'');
+      if(urutan===null) return;
+      showLoading(true,'Memperbarui mata pelajaran...');
+      google.script.run.withSuccessHandler(res=>{
+        showLoading(false);
+        if(res&&res.success){showToast(res.message||'Mapel diperbarui.');fetchData(true);}
+        else showToast((res&&res.message)||'Gagal memperbarui mapel.',true);
+      }).withFailureHandler(err=>{showLoading(false);showToast(err.message||'Error server',true);})
+        .simpanPemetaanAkademik('mapelMaster',{ID_Mapel:id,Nama_Mapel:nama,Urutan:Number(urutan),Aksi:'edit'},state.user.username);
+    }
+
+    function ubahStatusMasterMapel(id,aksi) {
+      const item=(state.db.masterMapel||[]).find(x=>String(x.ID_Mapel)===String(id));
+      if(!item) return;
+      if(!confirm((aksi==='nonaktifkan'?'Nonaktifkan':'Aktifkan')+' mata pelajaran '+item.Nama_Mapel+'?')) return;
+      showLoading(true,'Memperbarui status mata pelajaran...');
+      google.script.run.withSuccessHandler(res=>{
+        showLoading(false);
+        if(res&&res.success){showToast(res.message||'Status mapel diperbarui.');fetchData(true);}
+        else showToast((res&&res.message)||'Gagal memperbarui status.',true);
+      }).withFailureHandler(err=>{showLoading(false);showToast(err.message||'Error server',true);})
+        .simpanPemetaanAkademik('mapelMaster',{ID_Mapel:id,Aksi:aksi},state.user.username);
     }
 
     function simpanPemetaanUI(jenis) {
@@ -1990,22 +2048,12 @@
         : (state.db.siswa || []);
 
       if (type === 'intra') {
-        let standarMapel = [
-          {val: "Pendidikan Agama dan Budi Pekerti", label: "Pendidikan Agama dan Budi Pekerti"},
-          {val: "Pendidikan Pancasila", label: "Pendidikan Pancasila"},
-          {val: "Bahasa Indonesia", label: "Bahasa Indonesia"},
-          {val: "Matematika", label: "Matematika"},
-          {val: "Ilmu Pengetahuan Alam (IPA)", label: "Ilmu Pengetahuan Alam (IPA)"},
-          {val: "Ilmu Pengetahuan Sosial (IPS)", label: "Ilmu Pengetahuan Sosial (IPS)"},
-          {val: "Bahasa Inggris", label: "Bahasa Inggris"},
-          {val: "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)", label: "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)"},
-          {val: "Informatika", label: "Informatika"},
-          {val: "Seni Budaya", label: "Seni Budaya"},
-          {val: "Prakarya", label: "Prakarya"},
-          {val: "Muatan Lokal", label: "Muatan Lokal"},
-          {val: "Koding dan Kecerdasan Artifisial (KKA)", label: "Koding dan Kecerdasan Artifisial (KKA)"},
-        ];
-        
+        let standarMapel = (state.db.masterMapel||[])
+          .filter(m=>String(m.Status||'Aktif').toLowerCase()==='aktif')
+          .sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999))
+          .map(m=>({val:String(m.Nama_Mapel||''),label:String(m.Nama_Mapel||'')}))
+          .filter(m=>m.val);
+
         let opsiMapel = '<option value="">-- Pilih Mata Pelajaran --</option>';
         if (role === 'guru') {
           getMapelDiampuGuru().forEach(m => {
@@ -3354,21 +3402,10 @@ function renderCatatan(container) {
       );
 
       // Urutan rapor mengikuti urutan Daftar Mata Pelajaran pada Input Nilai.
-      const urutanMapel = [
-        "Pendidikan Agama dan Budi Pekerti",
-        "Pendidikan Pancasila",
-        "Bahasa Indonesia",
-        "Matematika",
-        "Ilmu Pengetahuan Alam (IPA)",
-        "Ilmu Pengetahuan Sosial (IPS)",
-        "Bahasa Inggris",
-        "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)",
-        "Informatika",
-        "Seni Budaya",
-        "Prakarya",
-        "Muatan Lokal",
-        "Koding dan Kecerdasan Artifisial (KKA)",
-      ];
+      const urutanMapel = (state.db.masterMapel||[])
+        .filter(x=>String(x.Status||'Aktif').toLowerCase()==='aktif')
+        .sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999))
+        .map(x=>String(x.Nama_Mapel||'').trim()).filter(Boolean);
 
       const indexMapel = mapel => {
         const i = urutanMapel.findIndex(m => mapelSama(m, mapel));
