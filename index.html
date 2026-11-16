@@ -927,13 +927,14 @@
       const opsiTema = '<option value="">-- Pilih Tema --</option>' + (state.db.temaProjek||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()!=='nonaktif').map(x=>`<option value="${escapeHtml(x.Tema_Projek)}">${escapeHtml(x.Tema_Projek)}</option>`).join('');
       const opsiEkstra = (state.db.masterEkstra||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()!=='nonaktif').map(x=>`<option value="${escapeHtml(x.Nama_Ekskul)}">${escapeHtml(x.Nama_Ekskul)}</option>`).join('');
       const mapel = (state.db.masterMapel||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()==='aktif').sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999)).map(x=>String(x.Nama_Mapel||'').trim()).filter(Boolean);
-      const tblIntra=(state.db.pemetaanIntra||[]).filter(x=>x.Tahun_Ajaran===ta&&x.Semester===sm).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml((kelas.find(k=>k.ID_Kelas===x.ID_Kelas)||{}).Nama_Kelas||x.ID_Kelas)}</td><td class="p-2">${escapeHtml(x.Mata_Pelajaran)}</td></tr>`).join('');
-      const tblDim=(state.db.dimensiP5||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Dimensi)}</td></tr>`).join('');
-      const tblTema=(state.db.temaProjek||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Tema_Projek)}</td></tr>`).join('');
-      const tblEkstra=(state.db.masterEkstra||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Nama_Ekskul)}</td></tr>`).join('');
+      const tblIntra=(state.db.pemetaanIntra||[]).filter(x=>x.Tahun_Ajaran===ta&&x.Semester===sm).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml((kelas.find(k=>k.ID_Kelas===x.ID_Kelas)||{}).Nama_Kelas||x.ID_Kelas)}</td><td class="p-2">${escapeHtml(x.Mata_Pelajaran)}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editPemetaanIntra('${escapeHtml(ta)}','${escapeHtml(sm)}','${escapeHtml(x.ID_Kelas)}','${escapeHtml(x.Mata_Pelajaran)}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="hapusPemetaanIntra('${escapeHtml(ta)}','${escapeHtml(sm)}','${escapeHtml(x.ID_Kelas)}','${escapeHtml(x.Mata_Pelajaran)}')" class="text-rose-600 font-bold px-2">Hapus</button></td></tr>`).join('');
+      const tblDim=(state.db.dimensiP5||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Dimensi)}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editPemetaanMaster('dimensi','${escapeHtml(x.Dimensi)}','ID_Dimensi','${escapeHtml(x.ID_Dimensi||'')}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="hapusPemetaanMaster('dimensi','${escapeHtml(x.Dimensi)}','ID_Dimensi','${escapeHtml(x.ID_Dimensi||'')}')" class="text-rose-600 font-bold px-2">Hapus</button></td></tr>`).join('');
+      const tblTema=(state.db.temaProjek||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Tema_Projek)}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editPemetaanMaster('tema','${escapeHtml(x.Tema_Projek)}','ID_Tema','${escapeHtml(x.ID_Tema||'')}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="hapusPemetaanMaster('tema','${escapeHtml(x.Tema_Projek)}','ID_Tema','${escapeHtml(x.ID_Tema||'')}')" class="text-rose-600 font-bold px-2">Hapus</button></td></tr>`).join('');
+      const tblEkstra=(state.db.masterEkstra||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Nama_Ekskul)}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editPemetaanMaster('ekstraMaster','${escapeHtml(x.Nama_Ekskul)}','ID_Ekstra','${escapeHtml(x.ID_Ekstra||'')}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="hapusPemetaanMaster('ekstraMaster','${escapeHtml(x.Nama_Ekskul)}','ID_Ekstra','${escapeHtml(x.ID_Ekstra||'')}')" class="text-rose-600 font-bold px-2">Hapus</button></td></tr>`).join('');
       const kelompokAktif=(state.db.kelompokProjek||[]).filter(x=>x.Tahun_Ajaran===ta&&x.Semester===sm&&x.Status==='Aktif');
       const kelompokUnik=[...new Map(kelompokAktif.map(x=>[x.ID_Projek,x])).values()];
-      const tblKelompok=kelompokUnik.map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml((kelas.find(k=>k.ID_Kelas===x.ID_Kelas)||{}).Nama_Kelas||x.ID_Kelas)}</td><td class="p-2">${escapeHtml(x.Nama_Kelompok)}</td><td class="p-2">${kelompokAktif.filter(a=>a.ID_Projek===x.ID_Projek).length}</td><td class="p-2">${escapeHtml(x.Dimensi_P5)}</td><td class="p-2">${escapeHtml(x.Tema_Projek)}</td></tr>`).join('');
+      const tblKelompok=kelompokUnik.map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml((kelas.find(k=>k.ID_Kelas===x.ID_Kelas)||{}).Nama_Kelas||x.ID_Kelas)}</td><td class="p-2">${escapeHtml(x.Nama_Kelompok)}</td><td class="p-2">${kelompokAktif.filter(a=>a.ID_Projek===x.ID_Projek).length}</td><td class="p-2">${escapeHtml(x.Dimensi_P5)}</td><td class="p-2">${escapeHtml(x.Tema_Projek)}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editKelompokProjek('${escapeHtml(x.ID_Projek)}','${escapeHtml(x.Nama_Kelompok)}','${escapeHtml(x.ID_Kelas)}','${escapeHtml(x.Dimensi_P5)}','${escapeHtml(x.Tema_Projek)}','${escapeHtml(ta)}','${escapeHtml(sm)}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="hapusKelompokProjek('${escapeHtml(x.ID_Projek)}')" class="text-rose-600 font-bold px-2">Hapus</button></td></tr>`).join('');
+      const tblPilihanEkstra=(state.db.pemetaanEkstra||[]).filter(x=>x.Tahun_Ajaran===ta&&x.Semester===sm).map((x,i)=>{const siswaObj=siswa.find(s=>normalisasiNISNFront(s.NISN)===normalisasiNISNFront(x.NISN));return `<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(siswaObj?siswaObj.Nama_Lengkap:x.NISN)}</td><td class="p-2">${escapeHtml((kelas.find(k=>k.ID_Kelas===x.ID_Kelas)||{}).Nama_Kelas||x.ID_Kelas)}</td><td class="p-2">${escapeHtml(x.Nama_Ekskul)}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editPilihanEkstra('${escapeHtml(ta)}','${escapeHtml(sm)}','${escapeHtml(x.NISN)}','${escapeHtml(x.Nama_Ekskul)}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="hapusPilihanEkstra('${escapeHtml(ta)}','${escapeHtml(sm)}','${escapeHtml(x.NISN)}','${escapeHtml(x.Nama_Ekskul)}')" class="text-rose-600 font-bold px-2">Hapus</button></td></tr>`;}).join('');
       container.innerHTML=`
         <div class="space-y-6 fade-in">
           <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-5">
@@ -951,7 +952,7 @@
               <button onclick="simpanMasterMapel()" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 font-bold"><i class="fas fa-plus mr-1"></i>Tambah Mapel</button>
             </div>
             <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-2 text-left">Urutan</th><th class="p-2 text-left">Mata Pelajaran</th><th class="p-2 text-left">Status</th><th class="p-2 text-right">Aksi</th></tr></thead><tbody>
-              ${(state.db.masterMapel||[]).slice().sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999)).map(x=>`<tr class="border-b"><td class="p-2">${escapeHtml(x.Urutan||'-')}</td><td class="p-2 font-medium">${escapeHtml(x.Nama_Mapel||'')}</td><td class="p-2">${String(x.Status||'Aktif').toLowerCase()==='aktif'?'Aktif':'Nonaktif'}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editMasterMapel('${escapeHtml(x.ID_Mapel)}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="ubahStatusMasterMapel('${escapeHtml(x.ID_Mapel)}','${String(x.Status||'Aktif').toLowerCase()==='aktif'?'nonaktifkan':'aktifkan'}')" class="text-rose-600 font-bold px-2">${String(x.Status||'Aktif').toLowerCase()==='aktif'?'Nonaktifkan':'Aktifkan'}</button></td></tr>`).join('')||'<tr><td colspan="4" class="p-3 text-center text-slate-400">Belum ada mata pelajaran.</td></tr>'}
+              ${(state.db.masterMapel||[]).slice().sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999)).map(x=>`<tr class="border-b"><td class="p-2">${escapeHtml(x.Urutan||'-')}</td><td class="p-2 font-medium">${escapeHtml(x.Nama_Mapel||'')}</td><td class="p-2">${String(x.Status||'Aktif').toLowerCase()==='aktif'?'Aktif':'Nonaktif'}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editMasterMapel('${escapeHtml(x.ID_Mapel)}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="ubahStatusMasterMapel('${escapeHtml(x.ID_Mapel)}','${String(x.Status||'Aktif').toLowerCase()==='aktif'?'nonaktifkan':'aktifkan'}')" class="text-rose-600 font-bold px-2">${String(x.Status||'Aktif').toLowerCase()==='aktif'?'Nonaktifkan':'Aktifkan'}</button><button onclick="hapusMasterMapel('${escapeHtml(x.ID_Mapel)}')" class="text-red-700 font-bold px-2">Hapus</button></td></tr>`).join('')||'<tr><td colspan="4" class="p-3 text-center text-slate-400">Belum ada mata pelajaran.</td></tr>'}
             </tbody></table></div>
           </div>
           <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
@@ -961,18 +962,18 @@
               <select id="map-intra-mapel" class="border rounded-lg p-2"><option value="">-- Pilih Mata Pelajaran --</option>${mapel.map(m=>`<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('')}</select>
               <button onclick="simpanPemetaanUI('intra')" class="bg-blue-600 text-white rounded-lg px-4 py-2 font-bold">Simpan Mapel</button>
             </div>
-            <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-2 text-left">No</th><th class="p-2 text-left">Kelas</th><th class="p-2 text-left">Mata Pelajaran</th></tr></thead><tbody>${tblIntra||'<tr><td colspan="3" class="p-4 text-center text-slate-400">Belum ada pemetaan periode ini.</td></tr>'}</tbody></table></div>
+            <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-2 text-left">No</th><th class="p-2 text-left">Kelas</th><th class="p-2 text-left">Mata Pelajaran</th><th class="p-2 text-right">Aksi</th></tr></thead><tbody>${tblIntra||'<tr><td colspan="3" class="p-4 text-center text-slate-400">Belum ada pemetaan periode ini.</td></tr>'}</tbody></table></div>
           </div>
           <div class="grid lg:grid-cols-2 gap-6">
             <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
               <h3 class="font-bold"><i class="fas fa-layer-group text-violet-600 mr-2"></i>2. Master Dimensi P5</h3>
               <div class="flex gap-2"><input id="master-dimensi" class="min-w-0 flex-1 border rounded-lg p-2" placeholder="Masukkan nama dimensi"><button onclick="simpanPemetaanUI('dimensi')" class="bg-violet-600 text-white rounded-lg px-4 font-bold">Tambah</button></div>
-              <div class="max-h-48 overflow-auto"><table class="w-full text-sm"><tbody>${tblDim||'<tr><td class="p-3 text-slate-400">Belum ada dimensi.</td></tr>'}</tbody></table></div>
+              <div class="max-h-48 overflow-auto"><table class="w-full text-sm"><thead><tr><th class="p-2 text-left">No</th><th class="p-2 text-left">Dimensi</th><th class="p-2 text-right">Aksi</th></tr></thead><tbody>${tblDim||'<tr><td class="p-3 text-slate-400">Belum ada dimensi.</td></tr>'}</tbody></table></div>
             </div>
             <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
               <h3 class="font-bold"><i class="fas fa-lightbulb text-amber-500 mr-2"></i>3. Master Tema Projek</h3>
               <div class="flex gap-2"><input id="master-tema" class="min-w-0 flex-1 border rounded-lg p-2" placeholder="Masukkan tema projek"><button onclick="simpanPemetaanUI('tema')" class="bg-amber-500 text-white rounded-lg px-4 font-bold">Tambah</button></div>
-              <div class="max-h-48 overflow-auto"><table class="w-full text-sm"><tbody>${tblTema||'<tr><td class="p-3 text-slate-400">Belum ada tema.</td></tr>'}</tbody></table></div>
+              <div class="max-h-48 overflow-auto"><table class="w-full text-sm"><thead><tr><th class="p-2 text-left">No</th><th class="p-2 text-left">Tema Projek</th><th class="p-2 text-right">Aksi</th></tr></thead><tbody>${tblTema||'<tr><td class="p-3 text-slate-400">Belum ada tema.</td></tr>'}</tbody></table></div>
             </div>
           </div>
           <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
@@ -986,13 +987,13 @@
             </div>
             <div><label class="block font-bold text-sm mb-2">Pilih Anggota Kelompok</label><div id="map-grup-anggota" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 border rounded-xl p-3 max-h-64 overflow-auto text-sm"><span class="text-slate-400">Pilih kelas terlebih dahulu.</span></div></div>
             <button onclick="simpanPemetaanUI('kelompok')" class="bg-emerald-600 text-white rounded-lg px-5 py-2.5 font-bold">Simpan Kelompok dan Anggota</button>
-            <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-2 text-left">No</th><th class="p-2 text-left">Kelas</th><th class="p-2 text-left">Kelompok</th><th class="p-2 text-left">Anggota</th><th class="p-2 text-left">Dimensi</th><th class="p-2 text-left">Tema</th></tr></thead><tbody>${tblKelompok||'<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada kelompok pada periode ini.</td></tr>'}</tbody></table></div>
+            <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-2 text-left">No</th><th class="p-2 text-left">Kelas</th><th class="p-2 text-left">Kelompok</th><th class="p-2 text-left">Anggota</th><th class="p-2 text-left">Dimensi</th><th class="p-2 text-left">Tema</th><th class="p-2 text-right">Aksi</th></tr></thead><tbody>${tblKelompok||'<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada kelompok pada periode ini.</td></tr>'}</tbody></table></div>
           </div>
           <div class="grid lg:grid-cols-2 gap-6">
             <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
               <h3 class="font-bold"><i class="fas fa-person-running text-rose-600 mr-2"></i>5. Master Ekstrakurikuler</h3>
               <div class="flex gap-2"><input id="master-ekstra" class="min-w-0 flex-1 border rounded-lg p-2" placeholder="Nama ekstrakurikuler"><button onclick="simpanPemetaanUI('ekstraMaster')" class="bg-rose-600 text-white rounded-lg px-4 font-bold">Tambah</button></div>
-              <div class="max-h-48 overflow-auto"><table class="w-full text-sm"><tbody>${tblEkstra||'<tr><td class="p-3 text-slate-400">Belum ada ekstrakurikuler.</td></tr>'}</tbody></table></div>
+              <div class="max-h-48 overflow-auto"><table class="w-full text-sm"><thead><tr><th class="p-2 text-left">No</th><th class="p-2 text-left">Ekstrakurikuler</th><th class="p-2 text-right">Aksi</th></tr></thead><tbody>${tblEkstra||'<tr><td class="p-3 text-slate-400">Belum ada ekstrakurikuler.</td></tr>'}</tbody></table></div>
             </div>
             <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
               <h3 class="font-bold"><i class="fas fa-user-check text-cyan-600 mr-2"></i>6. Pilihan Ekstrakurikuler Siswa</h3>
@@ -1001,6 +1002,7 @@
               <select id="map-ekstra-pilihan" multiple size="5" class="w-full border rounded-lg p-2">${opsiEkstra}</select>
               <p class="text-xs text-slate-500">Gunakan Ctrl (komputer) atau pilih beberapa item yang tersedia. Setiap siswa boleh memiliki lebih dari satu ekstrakurikuler.</p>
               <button onclick="simpanPemetaanUI('ekstraSiswa')" class="bg-cyan-700 text-white rounded-lg px-5 py-2.5 font-bold">Simpan Pilihan Siswa</button>
+              <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-2 text-left">No</th><th class="p-2 text-left">Siswa</th><th class="p-2 text-left">Kelas</th><th class="p-2 text-left">Ekstrakurikuler</th><th class="p-2 text-right">Aksi</th></tr></thead><tbody>${tblPilihanEkstra||'<tr><td colspan="5" class="p-3 text-center text-slate-400">Belum ada pilihan ekstrakurikuler pada periode ini.</td></tr>'}</tbody></table></div>
             </div>
           </div>
         </div>`;
@@ -1053,6 +1055,12 @@
         .simpanPemetaanAkademik('mapelMaster',{ID_Mapel:id,Nama_Mapel:nama,Urutan:Number(urutan),Aksi:'edit'},state.user.username);
     }
 
+    function hapusMasterMapel(id) {
+      const item=(state.db.masterMapel||[]).find(x=>String(x.ID_Mapel)===String(id));
+      if(!item)return;
+      jalankanAksiPemetaan('mapelMaster',{ID_Mapel:id,Aksi:'hapus'},'hapus');
+    }
+
     function ubahStatusMasterMapel(id,aksi) {
       const item=(state.db.masterMapel||[]).find(x=>String(x.ID_Mapel)===String(id));
       if(!item) return;
@@ -1082,6 +1090,58 @@
         else showToast((res&&res.message)||'Pemetaan gagal disimpan.',true);
       }).withFailureHandler(err=>{showLoading(false);showToast('Gagal menyimpan pemetaan: '+(err.message||'Error server.'),true);})
         .simpanPemetaanAkademik(jenis,payload,state.user.username);
+    }
+
+
+    function jalankanAksiPemetaan(jenis,payload,aksi) {
+      if(!confirm(aksi==='hapus'?'Yakin ingin menghapus data ini?':'Simpan perubahan data ini?')) return;
+      payload=Object.assign({},payload,{Aksi:aksi});
+      showLoading(true,aksi==='hapus'?'Menghapus data pemetaan...':'Memperbarui data pemetaan...');
+      google.script.run.withSuccessHandler(res=>{
+        showLoading(false);
+        if(res&&res.success){showToast(res.message||'Berhasil.');fetchData(true);}
+        else showToast((res&&res.message)||'Operasi gagal.',true);
+      }).withFailureHandler(err=>{showLoading(false);showToast((err&&err.message)||'Kesalahan server.',true);})
+        .simpanPemetaanAkademik(jenis,payload,state.user.username);
+    }
+    function editPemetaanMaster(jenis,nilai,idField,id) {
+      const label=jenis==='dimensi'?'Dimensi':jenis==='tema'?'Tema projek':'Nama ekstrakurikuler';
+      const baru=prompt('Ubah '+label+':',nilai||'');
+      if(baru===null||!baru.trim())return;
+      const field=jenis==='dimensi'?'Dimensi':jenis==='tema'?'Tema_Projek':'Nama_Ekskul';
+      const p={[field]:baru.trim(),NilaiLama:nilai};
+      if(idField&&id)p[idField]=id;
+      jalankanAksiPemetaan(jenis,p,'edit');
+    }
+    function hapusPemetaanMaster(jenis,nilai,idField,id) {
+      const field=jenis==='dimensi'?'Dimensi':jenis==='tema'?'Tema_Projek':'Nama_Ekskul';
+      const p={NilaiLama:nilai}; if(idField&&id)p[idField]=id;
+      jalankanAksiPemetaan(jenis,p,'hapus');
+    }
+    function editPemetaanIntra(ta,sm,kelas,mapel) {
+      const kelasBaru=prompt('ID kelas baru (kosongkan jika tetap):',kelas);
+      if(kelasBaru===null)return;
+      const mapelBaru=prompt('Mata pelajaran baru:',mapel);
+      if(mapelBaru===null||!mapelBaru.trim())return;
+      jalankanAksiPemetaan('intra',{Lama:{Tahun_Ajaran:ta,Semester:sm,ID_Kelas:kelas,Mata_Pelajaran:mapel},Tahun_Ajaran:ta,Semester:sm,ID_Kelas:kelasBaru||kelas,Mata_Pelajaran:mapelBaru.trim()},'edit');
+    }
+    function hapusPemetaanIntra(ta,sm,kelas,mapel) {
+      jalankanAksiPemetaan('intra',{Lama:{Tahun_Ajaran:ta,Semester:sm,ID_Kelas:kelas,Mata_Pelajaran:mapel}},'hapus');
+    }
+    function editKelompokProjek(id,nama,kelas,dim,tema,ta,sm) {
+      const baru=prompt('Ubah nama kelompok:',nama); if(baru===null||!baru.trim())return;
+      const dimBaru=prompt('Ubah dimensi P5:',dim); if(dimBaru===null)return;
+      const temaBaru=prompt('Ubah tema projek:',tema); if(temaBaru===null)return;
+      const anggota=(state.db.kelompokProjek||[]).filter(x=>String(x.ID_Projek)===String(id)).map(x=>x.NISN);
+      jalankanAksiPemetaan('kelompok',{ID_Projek:id,Tahun_Ajaran:ta,Semester:sm,ID_Kelas:kelas,Nama_Kelompok:baru.trim(),Dimensi_P5:dimBaru,Tema_Projek:temaBaru,NISN:anggota},'edit');
+    }
+    function hapusKelompokProjek(id) { jalankanAksiPemetaan('kelompok',{ID_Projek:id},'hapus'); }
+    function editPilihanEkstra(ta,sm,nisn,nama) {
+      const baru=prompt('Ubah nama ekstrakurikuler:',nama); if(baru===null||!baru.trim())return;
+      jalankanAksiPemetaan('ekstraSiswa',{Tahun_Ajaran:ta,Semester:sm,NISN:nisn,Nama_Ekskul:nama,Nama_EkskulBaru:baru.trim()},'edit');
+    }
+    function hapusPilihanEkstra(ta,sm,nisn,nama) {
+      jalankanAksiPemetaan('ekstraSiswa',{Tahun_Ajaran:ta,Semester:sm,NISN:nisn,Nama_Ekskul:nama},'hapus');
     }
 
     function renderMonitoringNilai(container) {
