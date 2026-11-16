@@ -1055,51 +1055,57 @@
       `;
     }
 
-    function renderSiswa(container) {
+    function renderSiswa(container, tab = 'aktif') {
       if(!state.db.siswa) state.db.siswa = [];
-      let rows = state.db.siswa.map((s, i) => `
+      // Data alumni tetap berada di sheet Siswa; pemisahan hanya pada tampilan.
+      // Format kelas alumni mengikuti proses rollover: "ALUMNI <tahun ajaran>".
+      const semuaSiswa = state.db.siswa;
+      const isAlumni = s => /^ALUMNI\b/i.test(String(s.ID_Kelas || '').trim());
+      const siswaAktif = semuaSiswa.filter(s => !isAlumni(s));
+      const siswaAlumni = semuaSiswa.filter(isAlumni);
+      const daftar = tab === 'alumni' ? siswaAlumni : siswaAktif;
+      const rows = daftar.map((s, i) => `
         <tr class="border-b border-slate-100 hover:bg-blue-50/50 transition-colors">
           <td class="py-4 px-4 text-center text-slate-500 font-medium">${i + 1}</td>
-          <td class="py-4 px-4 font-bold text-slate-700">${s.NISN}</td>
-          <td class="py-4 px-4 text-slate-800 font-medium">${s.Nama_Lengkap}</td>
+          <td class="py-4 px-4 font-bold text-slate-700">${s.NISN || '-'}</td>
+          <td class="py-4 px-4 text-slate-800 font-medium">${s.Nama_Lengkap || '-'}</td>
           <td class="py-4 px-4 text-center">
-            <span class="px-2.5 py-1 rounded-md text-xs font-bold ${s.Jenis_Kelamin==='L'?'bg-blue-100 text-blue-700':'bg-pink-100 text-pink-700'}">${s.Jenis_Kelamin}</span>
+            <span class="px-2.5 py-1 rounded-md text-xs font-bold ${s.Jenis_Kelamin==='L'?'bg-blue-100 text-blue-700':'bg-pink-100 text-pink-700'}">${s.Jenis_Kelamin || '-'}</span>
           </td>
-          <td class="py-4 px-4 text-center font-bold text-slate-600">${s.ID_Kelas}</td>
-          <td class="py-4 px-4 text-center flex justify-center gap-2">
-            <button onclick="bukaModalSiswa('${s.NISN}')" class="text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-              <i class="fas fa-edit"></i> Edit
-            </button>
-            <button onclick="bukaRiwayatSiswa('${s.NISN}', '${escapeHtml(s.Nama_Lengkap)}')" class="text-emerald-600 border border-emerald-200 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-emerald-600 hover:text-white transition-all shadow-sm">
-              <i class="fas fa-chart-line"></i> Riwayat
-            </button>
+          <td class="py-4 px-4 text-center font-bold text-slate-600">${s.ID_Kelas || '-'}</td>
+          <td class="py-4 px-4 text-center">
+            <div class="flex justify-center gap-2">
+              ${tab === 'aktif' ? `<button onclick="bukaModalSiswa('${s.NISN}')" class="text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-blue-600 hover:text-white transition-all shadow-sm"><i class="fas fa-edit"></i> Edit</button>` : '<span class="text-xs text-slate-400 font-semibold px-2 py-1">Arsip alumni</span>'}
+              <button onclick="bukaRiwayatSiswa('${s.NISN}', '${escapeHtml(s.Nama_Lengkap)}')" class="text-emerald-600 border border-emerald-200 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-emerald-600 hover:text-white transition-all shadow-sm">
+                <i class="fas fa-chart-line"></i> Riwayat
+              </button>
+            </div>
           </td>
         </tr>`).join('');
-        
+
       container.innerHTML = `
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden fade-in">
           <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center flex-wrap gap-4">
             <div class="flex items-center gap-3">
                <div class="bg-indigo-100 p-2 rounded-lg text-indigo-600"><i class="fas fa-users"></i></div>
-               <h2 class="font-bold text-slate-800 text-lg tracking-tight">Daftar Siswa</h2>
+               <div><h2 class="font-bold text-slate-800 text-lg tracking-tight">Manajemen Data Siswa</h2><p class="text-xs text-slate-500 mt-1">Data aktif dan alumni ditampilkan terpisah tanpa memindahkan data spreadsheet.</p></div>
             </div>
-            <button onclick="bukaModalSiswa()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-md text-sm font-bold transition-all transform hover:-translate-y-0.5">
-              <i class="fas fa-plus mr-1.5"></i> Tambah Siswa
-            </button>
+            ${tab === 'aktif' ? `<button onclick="bukaModalSiswa()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-md text-sm font-bold transition-all transform hover:-translate-y-0.5"><i class="fas fa-plus mr-1.5"></i> Tambah Siswa</button>` : ''}
+          </div>
+          <div class="px-6 pt-5 flex flex-wrap gap-2 border-b border-slate-100">
+            <button onclick="renderSiswa(document.getElementById('content-area'), 'aktif')" class="px-4 py-2.5 rounded-t-lg text-sm font-bold transition-all ${tab === 'aktif' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}"><i class="fas fa-user-graduate mr-2"></i>Siswa Aktif <span class="ml-1 opacity-80">(${siswaAktif.length})</span></button>
+            <button onclick="renderSiswa(document.getElementById('content-area'), 'alumni')" class="px-4 py-2.5 rounded-t-lg text-sm font-bold transition-all ${tab === 'alumni' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}"><i class="fas fa-graduation-cap mr-2"></i>Data Alumni <span class="ml-1 opacity-80">(${siswaAlumni.length})</span></button>
+          </div>
+          <div class="px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
+            <div><h3 class="font-bold text-slate-800">${tab === 'alumni' ? 'Arsip Data Alumni' : 'Daftar Siswa Aktif'}</h3><p class="text-xs text-slate-500 mt-1">${tab === 'alumni' ? 'Data alumni hanya untuk melihat identitas dan riwayat akademik.' : 'Hanya siswa aktif yang ditampilkan untuk pengelolaan data.'}</p></div>
+            <span class="text-xs font-bold px-3 py-1.5 rounded-full ${tab === 'alumni' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}">${daftar.length} siswa</span>
           </div>
           <div class="overflow-x-auto w-full">
             <table class="w-full text-sm text-left">
               <thead class="bg-slate-100 text-slate-500 uppercase text-xs font-extrabold border-b border-slate-200 tracking-wider">
-                <tr>
-                  <th class="py-4 px-4 text-center w-12 rounded-tl-lg">No</th>
-                  <th class="py-4 px-4">NISN</th>
-                  <th class="py-4 px-4">Nama Lengkap</th>
-                  <th class="py-4 px-4 text-center">L/P</th>
-                  <th class="py-4 px-4 text-center">Kelas</th>
-                  <th class="py-4 px-4 text-center rounded-tr-lg">Aksi</th>
-                </tr>
+                <tr><th class="py-4 px-4 text-center w-12 rounded-tl-lg">No</th><th class="py-4 px-4">NISN</th><th class="py-4 px-4">Nama Lengkap</th><th class="py-4 px-4 text-center">L/P</th><th class="py-4 px-4 text-center">Kelas / Status</th><th class="py-4 px-4 text-center rounded-tr-lg">Aksi</th></tr>
               </thead>
-              <tbody>${rows || '<tr><td colspan="6" class="text-center py-12 text-slate-400 font-medium">Belum ada data siswa ditemukan</td></tr>'}</tbody>
+              <tbody>${rows || `<tr><td colspan="6" class="text-center py-12 text-slate-400 font-medium">${tab === 'alumni' ? 'Belum ada data alumni ditemukan' : 'Belum ada data siswa aktif ditemukan'}</td></tr>`}</tbody>
             </table>
           </div>
         </div>`;
