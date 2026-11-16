@@ -414,6 +414,7 @@
           <p class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 mt-8">Administrator</p>
           <button onclick="nav('pengaturan')" class="nav-btn w-full text-left py-2.5 px-3 rounded-lg hover:bg-slate-800 hover:text-white transition-all flex items-center gap-3 font-medium" data-target="pengaturan"><i class="fas fa-cogs w-5 text-center"></i> Pengaturan Sekolah</button>
           <button onclick="nav('monitor-nilai')" class="nav-btn w-full text-left py-2.5 px-3 rounded-lg hover:bg-slate-800 hover:text-white transition-all flex items-center gap-3 font-medium" data-target="monitor-nilai"><i class="fas fa-clipboard-check w-5 text-center text-emerald-400"></i> Monitoring Nilai Guru</button>
+          <button onclick="nav('pemetaan')" class="nav-btn w-full text-left py-2.5 px-3 rounded-lg hover:bg-slate-800 hover:text-white transition-all flex items-center gap-3 font-medium" data-target="pemetaan"><i class="fas fa-diagram-project w-5 text-center text-amber-400"></i> Pemetaan Akademik</button>
         </div>
       </nav>
       
@@ -576,7 +577,7 @@
 
     let state = { 
       user: null, 
-      db: { pengaturan: {}, kelas: [], siswa: [], kehadiran: [], nilaiIntra: [], nilaiKoko: [], nilaiEkstra: [], catatanWali: [], users: [] }, 
+      db: { pengaturan: {}, kelas: [], siswa: [], kehadiran: [], nilaiIntra: [], nilaiKoko: [], nilaiEkstra: [], catatanWali: [], users: [], pemetaanIntra: [], dimensiP5: [], temaProjek: [], kelompokProjek: [], masterEkstra: [], pemetaanEkstra: [] }, 
       currentView: 'dashboard', 
       filter: { ta: '', sm: '' } 
     };
@@ -897,6 +898,7 @@
         case 'catatan': title.innerText = "Catatan Wali Kelas"; renderCatatan(content); break;
         case 'pengaturan': title.innerText = "Pengaturan Sekolah"; renderPengaturan(content); break;
         case 'monitor-nilai': title.innerText = "Monitoring Nilai Guru"; renderMonitoringNilai(content); break;
+        case 'pemetaan': title.innerText = "Pemetaan Akademik"; renderPemetaanAkademik(content); break;
         case 'cetak': title.innerText = "Cetak Dokumen Resmi"; renderCetak(content); break;
       }
     }
@@ -906,6 +908,124 @@
     // Tidak mengubah mekanisme Input Nilai/Simpan Nilai yang sudah ada.
     // Status dihitung dari data nilaiIntra pada Tahun Ajaran dan Semester aktif.
     // ============================================================
+
+    // ============================================================
+    // PEMETAAN AKADEMIK - ADMIN
+    // Data pemetaan disimpan pada sheet baru; sheet nilai lama tidak diubah.
+    // ============================================================
+    function renderPemetaanAkademik(container) {
+      if (String(state.user && state.user.role || '').trim().toLowerCase() !== 'admin') {
+        container.innerHTML = '<div class="p-6 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl font-bold">Akses ditolak. Pemetaan hanya untuk Administrator.</div>';
+        return;
+      }
+      const kelas = state.db.kelas || [];
+      const siswa = state.db.siswa || [];
+      const ta = String(state.filter.ta || '');
+      const sm = String(state.filter.sm || '');
+      const opsiKelas = '<option value="">-- Pilih Kelas --</option>' + kelas.map(k=>`<option value="${escapeHtml(k.ID_Kelas)}">${escapeHtml(k.Nama_Kelas || k.ID_Kelas)}</option>`).join('');
+      const opsiDimensi = '<option value="">-- Pilih Dimensi --</option>' + (state.db.dimensiP5||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()!=='nonaktif').map(x=>`<option value="${escapeHtml(x.Dimensi)}">${escapeHtml(x.Dimensi)}</option>`).join('');
+      const opsiTema = '<option value="">-- Pilih Tema --</option>' + (state.db.temaProjek||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()!=='nonaktif').map(x=>`<option value="${escapeHtml(x.Tema_Projek)}">${escapeHtml(x.Tema_Projek)}</option>`).join('');
+      const opsiEkstra = (state.db.masterEkstra||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()!=='nonaktif').map(x=>`<option value="${escapeHtml(x.Nama_Ekskul)}">${escapeHtml(x.Nama_Ekskul)}</option>`).join('');
+      const mapel = ['Pendidikan Agama dan Budi Pekerti','Pendidikan Pancasila','Bahasa Indonesia','Matematika','Ilmu Pengetahuan Alam (IPA)','Ilmu Pengetahuan Sosial (IPS)','Bahasa Inggris','Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)','Informatika','Seni Budaya','Prakarya','Muatan Lokal','Koding dan Kecerdasan Artifisial (KKA)'];
+      const tblIntra=(state.db.pemetaanIntra||[]).filter(x=>x.Tahun_Ajaran===ta&&x.Semester===sm).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml((kelas.find(k=>k.ID_Kelas===x.ID_Kelas)||{}).Nama_Kelas||x.ID_Kelas)}</td><td class="p-2">${escapeHtml(x.Mata_Pelajaran)}</td></tr>`).join('');
+      const tblDim=(state.db.dimensiP5||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Dimensi)}</td></tr>`).join('');
+      const tblTema=(state.db.temaProjek||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Tema_Projek)}</td></tr>`).join('');
+      const tblEkstra=(state.db.masterEkstra||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Nama_Ekskul)}</td></tr>`).join('');
+      const kelompokAktif=(state.db.kelompokProjek||[]).filter(x=>x.Tahun_Ajaran===ta&&x.Semester===sm&&x.Status==='Aktif');
+      const kelompokUnik=[...new Map(kelompokAktif.map(x=>[x.ID_Projek,x])).values()];
+      const tblKelompok=kelompokUnik.map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml((kelas.find(k=>k.ID_Kelas===x.ID_Kelas)||{}).Nama_Kelas||x.ID_Kelas)}</td><td class="p-2">${escapeHtml(x.Nama_Kelompok)}</td><td class="p-2">${kelompokAktif.filter(a=>a.ID_Projek===x.ID_Projek).length}</td><td class="p-2">${escapeHtml(x.Dimensi_P5)}</td><td class="p-2">${escapeHtml(x.Tema_Projek)}</td></tr>`).join('');
+      container.innerHTML=`
+        <div class="space-y-6 fade-in">
+          <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-5">
+            <h3 class="font-extrabold text-indigo-900 text-lg">Pemetaan Akademik</h3>
+            <p class="text-sm text-indigo-700 mt-1">Periode aktif: <b>${escapeHtml(ta)}</b> · Semester <b>${escapeHtml(sm)}</b>. Pemetaan baru disimpan pada sheet terpisah dan tidak menghapus nilai yang sudah ada.</p>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+            <h3 class="font-bold text-slate-800"><i class="fas fa-book text-blue-600 mr-2"></i>1. Pemetaan Intrakurikuler</h3>
+            <div class="grid md:grid-cols-3 gap-3">
+              <select id="map-intra-kelas" class="border rounded-lg p-2">${opsiKelas}</select>
+              <select id="map-intra-mapel" class="border rounded-lg p-2"><option value="">-- Pilih Mata Pelajaran --</option>${mapel.map(m=>`<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('')}</select>
+              <button onclick="simpanPemetaanUI('intra')" class="bg-blue-600 text-white rounded-lg px-4 py-2 font-bold">Simpan Mapel</button>
+            </div>
+            <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-2 text-left">No</th><th class="p-2 text-left">Kelas</th><th class="p-2 text-left">Mata Pelajaran</th></tr></thead><tbody>${tblIntra||'<tr><td colspan="3" class="p-4 text-center text-slate-400">Belum ada pemetaan periode ini.</td></tr>'}</tbody></table></div>
+          </div>
+          <div class="grid lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+              <h3 class="font-bold"><i class="fas fa-layer-group text-violet-600 mr-2"></i>2. Master Dimensi P5</h3>
+              <div class="flex gap-2"><input id="master-dimensi" class="min-w-0 flex-1 border rounded-lg p-2" placeholder="Masukkan nama dimensi"><button onclick="simpanPemetaanUI('dimensi')" class="bg-violet-600 text-white rounded-lg px-4 font-bold">Tambah</button></div>
+              <div class="max-h-48 overflow-auto"><table class="w-full text-sm"><tbody>${tblDim||'<tr><td class="p-3 text-slate-400">Belum ada dimensi.</td></tr>'}</tbody></table></div>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+              <h3 class="font-bold"><i class="fas fa-lightbulb text-amber-500 mr-2"></i>3. Master Tema Projek</h3>
+              <div class="flex gap-2"><input id="master-tema" class="min-w-0 flex-1 border rounded-lg p-2" placeholder="Masukkan tema projek"><button onclick="simpanPemetaanUI('tema')" class="bg-amber-500 text-white rounded-lg px-4 font-bold">Tambah</button></div>
+              <div class="max-h-48 overflow-auto"><table class="w-full text-sm"><tbody>${tblTema||'<tr><td class="p-3 text-slate-400">Belum ada tema.</td></tr>'}</tbody></table></div>
+            </div>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+            <h3 class="font-bold"><i class="fas fa-people-group text-emerald-600 mr-2"></i>4. Pembentukan Kelompok Projek per Kelas</h3>
+            <p class="text-xs text-slate-500">Pilih kelas, beri nama kelompok, tentukan dimensi dan tema, lalu pilih beberapa siswa dari kelas yang sama. Satu kelompok dapat berisi banyak siswa.</p>
+            <div class="grid md:grid-cols-2 gap-3">
+              <select id="map-grup-kelas" class="border rounded-lg p-2" onchange="muatAnggotaPemetaan()">${opsiKelas}</select>
+              <input id="map-grup-nama" class="border rounded-lg p-2" placeholder="Nama kelompok, contoh: Kelompok 1">
+              <select id="map-grup-dimensi" class="border rounded-lg p-2">${opsiDimensi}</select>
+              <select id="map-grup-tema" class="border rounded-lg p-2">${opsiTema}</select>
+            </div>
+            <div><label class="block font-bold text-sm mb-2">Pilih Anggota Kelompok</label><div id="map-grup-anggota" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 border rounded-xl p-3 max-h-64 overflow-auto text-sm"><span class="text-slate-400">Pilih kelas terlebih dahulu.</span></div></div>
+            <button onclick="simpanPemetaanUI('kelompok')" class="bg-emerald-600 text-white rounded-lg px-5 py-2.5 font-bold">Simpan Kelompok dan Anggota</button>
+            <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-2 text-left">No</th><th class="p-2 text-left">Kelas</th><th class="p-2 text-left">Kelompok</th><th class="p-2 text-left">Anggota</th><th class="p-2 text-left">Dimensi</th><th class="p-2 text-left">Tema</th></tr></thead><tbody>${tblKelompok||'<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada kelompok pada periode ini.</td></tr>'}</tbody></table></div>
+          </div>
+          <div class="grid lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+              <h3 class="font-bold"><i class="fas fa-person-running text-rose-600 mr-2"></i>5. Master Ekstrakurikuler</h3>
+              <div class="flex gap-2"><input id="master-ekstra" class="min-w-0 flex-1 border rounded-lg p-2" placeholder="Nama ekstrakurikuler"><button onclick="simpanPemetaanUI('ekstraMaster')" class="bg-rose-600 text-white rounded-lg px-4 font-bold">Tambah</button></div>
+              <div class="max-h-48 overflow-auto"><table class="w-full text-sm"><tbody>${tblEkstra||'<tr><td class="p-3 text-slate-400">Belum ada ekstrakurikuler.</td></tr>'}</tbody></table></div>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+              <h3 class="font-bold"><i class="fas fa-user-check text-cyan-600 mr-2"></i>6. Pilihan Ekstrakurikuler Siswa</h3>
+              <select id="map-ekstra-kelas" class="w-full border rounded-lg p-2" onchange="muatSiswaEkstra()">${opsiKelas}</select>
+              <select id="map-ekstra-siswa" class="w-full border rounded-lg p-2"><option value="">-- Pilih Siswa --</option></select>
+              <select id="map-ekstra-pilihan" multiple size="5" class="w-full border rounded-lg p-2">${opsiEkstra}</select>
+              <p class="text-xs text-slate-500">Gunakan Ctrl (komputer) atau pilih beberapa item yang tersedia. Setiap siswa boleh memiliki lebih dari satu ekstrakurikuler.</p>
+              <button onclick="simpanPemetaanUI('ekstraSiswa')" class="bg-cyan-700 text-white rounded-lg px-5 py-2.5 font-bold">Simpan Pilihan Siswa</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function muatAnggotaPemetaan() {
+      const id=document.getElementById('map-grup-kelas')?.value;
+      const box=document.getElementById('map-grup-anggota');
+      if(!box) return;
+      const daftar=(state.db.siswa||[]).filter(s=>String(s.ID_Kelas)===String(id));
+      box.innerHTML=daftar.length?daftar.map(s=>`<label class="flex items-center gap-2 p-2 rounded hover:bg-slate-50"><input type="checkbox" class="map-grup-check" value="${escapeHtml(s.NISN)}"><span>${escapeHtml(s.Nama_Lengkap)} <small class="text-slate-400">${escapeHtml(s.NISN)}</small></span></label>`).join(''):'<span class="text-slate-400">Tidak ada siswa pada kelas ini.</span>';
+    }
+
+    function muatSiswaEkstra() {
+      const id=document.getElementById('map-ekstra-kelas')?.value;
+      const el=document.getElementById('map-ekstra-siswa');
+      if(!el) return;
+      const daftar=(state.db.siswa||[]).filter(s=>String(s.ID_Kelas)===String(id));
+      el.innerHTML='<option value="">-- Pilih Siswa --</option>'+daftar.map(s=>`<option value="${escapeHtml(s.NISN)}">${escapeHtml(s.Nama_Lengkap)} (${escapeHtml(s.NISN)})</option>`).join('');
+    }
+
+    function simpanPemetaanUI(jenis) {
+      const ta=String(state.filter.ta||''), sm=String(state.filter.sm||'');
+      let payload={};
+      if(jenis==='intra') payload={Tahun_Ajaran:ta,Semester:sm,ID_Kelas:document.getElementById('map-intra-kelas').value,Mata_Pelajaran:document.getElementById('map-intra-mapel').value};
+      if(jenis==='dimensi') payload={Dimensi:document.getElementById('master-dimensi').value};
+      if(jenis==='tema') payload={Tema_Projek:document.getElementById('master-tema').value};
+      if(jenis==='ekstraMaster') payload={Nama_Ekskul:document.getElementById('master-ekstra').value};
+      if(jenis==='kelompok') payload={Tahun_Ajaran:ta,Semester:sm,ID_Kelas:document.getElementById('map-grup-kelas').value,Nama_Kelompok:document.getElementById('map-grup-nama').value,Dimensi_P5:document.getElementById('map-grup-dimensi').value,Tema_Projek:document.getElementById('map-grup-tema').value,NISN:Array.from(document.querySelectorAll('.map-grup-check:checked')).map(x=>x.value)};
+      if(jenis==='ekstraSiswa') payload={Tahun_Ajaran:ta,Semester:sm,ID_Kelas:document.getElementById('map-ekstra-kelas').value,NISN:document.getElementById('map-ekstra-siswa').value,Nama_Ekskul:Array.from(document.getElementById('map-ekstra-pilihan').selectedOptions).map(x=>x.value)};
+      showLoading(true,'Menyimpan pemetaan...');
+      google.script.run.withSuccessHandler(res=>{
+        showLoading(false);
+        if(res&&res.success){showToast(res.message||'Pemetaan tersimpan.');fetchData(true);}
+        else showToast((res&&res.message)||'Pemetaan gagal disimpan.',true);
+      }).withFailureHandler(err=>{showLoading(false);showToast('Gagal menyimpan pemetaan: '+(err.message||'Error server.'),true);})
+        .simpanPemetaanAkademik(jenis,payload,state.user.username);
+    }
+
     function renderMonitoringNilai(container) {
       const role = String(state.user && state.user.role || '').trim().toLowerCase();
       if (role !== 'admin') {
@@ -1398,9 +1518,19 @@
     function reloadNilaiIntraMapel(mapelValue) {
         const roleSekarang = String(state.user && state.user.role || '').trim().toLowerCase();
         const selectKelas = document.getElementById('filter-kelas-nilai');
-        const kelasDiampu = roleSekarang === 'admin'
+        let kelasDiampu = roleSekarang === 'admin'
           ? (state.db.kelas || [])
           : getKelasUntukMapelGuru(mapelValue);
+        const mappedRows = (state.db.pemetaanIntra || []).filter(x =>
+          String(x.Tahun_Ajaran || '') === String(state.filter.ta || '') &&
+          String(x.Semester || '') === String(state.filter.sm || '') &&
+          String(x.Mata_Pelajaran || '').trim().toLowerCase() === String(mapelValue || '').trim().toLowerCase() &&
+          String(x.Status || 'Aktif').toLowerCase() === 'aktif'
+        );
+        if (mappedRows.length) {
+          const idsMapped = new Set(mappedRows.map(x => String(x.ID_Kelas || '').trim()));
+          kelasDiampu = kelasDiampu.filter(k => idsMapped.has(String(k.ID_Kelas || '').trim()));
+        }
 
         if (selectKelas) {
           const nilaiSebelumnya = selectKelas.value;
@@ -1893,6 +2023,18 @@
           standarMapel.forEach(m => opsiMapel += `<option value="${m.val}">${m.label}</option>`);
         }
 
+        const pemetaanIntraAktif = (state.db.pemetaanIntra || []).filter(x =>
+          String(x.Tahun_Ajaran || '') === String(state.filter.ta || '') &&
+          String(x.Semester || '') === String(state.filter.sm || '') &&
+          String(x.Status || 'Aktif').toLowerCase() === 'aktif' &&
+          availableClasses.some(k => String(k.ID_Kelas || '') === String(x.ID_Kelas || ''))
+        );
+        if (pemetaanIntraAktif.length) {
+          const mapelTerpetakan = [...new Set(pemetaanIntraAktif.map(x => String(x.Mata_Pelajaran || '').trim()).filter(Boolean))];
+          opsiMapel = '<option value="">-- Pilih Mata Pelajaran --</option>' +
+            mapelTerpetakan.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+        }
+
         rows = siswaBolehDinilai.map((s, i) => `
         <tr class="border-b border-slate-200 hover:bg-slate-50 tr-nilai-siswa" data-nisn="${s.NISN}" data-kelas="${s.ID_Kelas}">
           <td class="py-2 px-2 text-center border-r border-slate-200 font-bold text-slate-500 nr-urut">${i+1}</td>
@@ -2006,12 +2148,13 @@
           <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-5 items-end">
             <div class="flex-1 min-w-[150px]">
               <label class="font-bold text-slate-700 block mb-1.5">Filter Kelas:</label>
-              <select class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-blue-500 bg-white font-medium outline-none shadow-sm" onchange="filterKelasNilai(this.value)">
+              <select id="filter-kelas-koko" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-blue-500 bg-white font-medium outline-none shadow-sm" onchange="muatKelompokP5()">
                 ${opsiKelasFilter}
               </select>
             </div>
-            <div class="flex-1 min-w-[200px]"><label class="font-bold text-slate-700 block mb-1.5">Dimensi P5:</label><input type="text" id="input-dimensi" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-blue-500 outline-none shadow-sm font-medium" placeholder="Cth: Gotong Royong"></div>
-            <div class="flex-1 min-w-[250px]"><label class="font-bold text-slate-700 block mb-1.5">Tema Projek:</label><input type="text" id="input-tema" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-blue-500 outline-none shadow-sm font-medium" placeholder="Cth: Gaya Hidup Berkelanjutan"></div>
+            <div class="flex-1 min-w-[200px]"><label class="font-bold text-slate-700 block mb-1.5">Kelompok Projek:</label><select id="input-kelompok-p5" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white" onchange="terapkanFilterKelompokP5()"><option value="">-- Pilih Kelompok --</option></select></div>
+            <div class="flex-1 min-w-[200px]"><label class="font-bold text-slate-700 block mb-1.5">Dimensi P5:</label><input type="text" id="input-dimensi" readonly class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 font-medium" placeholder="Terisi dari pemetaan Admin"></div>
+            <div class="flex-1 min-w-[220px]"><label class="font-bold text-slate-700 block mb-1.5">Tema Projek:</label><input type="text" id="input-tema" readonly class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 font-medium" placeholder="Terisi dari pemetaan Admin"></div>
           </div>
           <div class="overflow-x-auto">
              <table class="w-full text-sm text-left">
@@ -2031,6 +2174,7 @@
              <button type="button" onclick="unduhTemplateNilaiExcel('Koko')" class="bg-slate-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md hover:bg-slate-700 transition-all"><i class="fas fa-download mr-2"></i>Template Excel</button>
              <button onclick="simpanNilai('Koko')" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all transform hover:-translate-y-0.5"><i class="fas fa-save mr-2"></i>Simpan Raport P5</button>
           </div>`;
+        muatKelompokP5();
       } else if (type === 'ekstra') {
         rows = siswaBolehDinilai.map((s, i) => `
         <tr class="border-b border-slate-100 tr-nilai-siswa hover:bg-slate-50 transition-colors" data-nisn="${s.NISN}" data-kelas="${s.ID_Kelas}">
@@ -2051,11 +2195,11 @@
           <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-5 items-end">
              <div class="flex-1 min-w-[150px]">
               <label class="font-bold text-slate-700 block mb-1.5">Filter Kelas:</label>
-              <select class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-blue-500 bg-white font-medium outline-none shadow-sm" onchange="filterKelasNilai(this.value)">
+              <select id="filter-kelas-ekstra" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-blue-500 bg-white font-medium outline-none shadow-sm" onchange="muatPilihanEkstra()">
                 ${opsiKelasFilter}
               </select>
             </div>
-            <div class="flex-2 min-w-[300px]"><label class="font-bold text-slate-700 block mb-1.5">Nama Ekstrakurikuler:</label><input type="text" id="input-ekskul" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:border-blue-500 outline-none shadow-sm font-medium" placeholder="Cth: Pramuka, Futsal, Paskibra"></div>
+            <div class="flex-2 min-w-[300px]"><label class="font-bold text-slate-700 block mb-1.5">Nama Ekstrakurikuler:</label><select id="input-ekskul" onchange="terapkanFilterEkstra()" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white font-medium"><option value="">-- Pilih Ekstrakurikuler --</option>${opsiEkstra}</select></div>
           </div>
           <div class="overflow-x-auto">
              <table class="w-full text-sm text-left">
@@ -2075,7 +2219,61 @@
              <button type="button" onclick="unduhTemplateNilaiExcel('Ekstra')" class="bg-slate-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md hover:bg-slate-700 transition-all"><i class="fas fa-download mr-2"></i>Template Excel</button>
              <button onclick="simpanNilai('Ekstra')" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all transform hover:-translate-y-0.5"><i class="fas fa-save mr-2"></i>Simpan Ekstrakurikuler</button>
           </div>`;
+        muatPilihanEkstra();
       }
+    }
+
+
+    function muatKelompokP5() {
+      const kelasId=document.getElementById('filter-kelas-koko')?.value||'';
+      const groups=[...new Map((state.db.kelompokProjek||[]).filter(x =>
+        String(x.Tahun_Ajaran)===String(state.filter.ta) &&
+        String(x.Semester)===String(state.filter.sm) &&
+        String(x.ID_Kelas)===String(kelasId) &&
+        String(x.Status||'Aktif')==='Aktif'
+      ).map(x=>[x.ID_Projek,x])).values()];
+      const el=document.getElementById('input-kelompok-p5');
+      if(!el)return;
+      el.innerHTML='<option value="">-- Pilih Kelompok --</option>'+groups.map(g=>`<option value="${escapeHtml(g.ID_Projek)}">${escapeHtml(g.Nama_Kelompok)} · ${escapeHtml(g.Dimensi_P5)} · ${escapeHtml(g.Tema_Projek)}</option>`).join('');
+      terapkanFilterKelompokP5();
+    }
+
+    function terapkanFilterKelompokP5() {
+      const id=document.getElementById('input-kelompok-p5')?.value||'';
+      const g=(state.db.kelompokProjek||[]).find(x=>x.ID_Projek===id);
+      const d=document.getElementById('input-dimensi'),t=document.getElementById('input-tema');
+      if(d)d.value=g?g.Dimensi_P5:'';
+      if(t)t.value=g?g.Tema_Projek:'';
+      const members=new Set((state.db.kelompokProjek||[]).filter(x=>x.ID_Projek===id).map(x=>String(x.NISN)));
+      document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr=>{
+        tr.style.display=id&&members.has(String(tr.getAttribute('data-nisn')))?'':'none';
+      });
+    }
+
+    function muatPilihanEkstra() {
+      const kelasId=document.getElementById('filter-kelas-ekstra')?.value||'';
+      const sel=document.getElementById('input-ekskul');
+      if(!sel)return;
+      const available=(state.db.masterEkstra||[]).filter(x=>String(x.Status||'Aktif')==='Aktif').map(x=>x.Nama_Ekskul);
+      const current=sel.value;
+      sel.innerHTML='<option value="">-- Pilih Ekstrakurikuler --</option>'+available.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+      if(available.includes(current))sel.value=current;
+      terapkanFilterEkstra();
+    }
+
+    function terapkanFilterEkstra() {
+      const kelasId=document.getElementById('filter-kelas-ekstra')?.value||'';
+      const ekskul=document.getElementById('input-ekskul')?.value||'';
+      const assigned=new Set((state.db.pemetaanEkstra||[]).filter(x=>
+        String(x.Tahun_Ajaran)===String(state.filter.ta) &&
+        String(x.Semester)===String(state.filter.sm) &&
+        String(x.ID_Kelas)===String(kelasId) &&
+        String(x.Nama_Ekskul)===String(ekskul) &&
+        String(x.Status||'Aktif')==='Aktif'
+      ).map(x=>String(x.NISN)));
+      document.querySelectorAll('#tbl-nilai-ekstra tr[data-nisn]').forEach(tr=>{
+        tr.style.display=ekskul&&assigned.has(String(tr.getAttribute('data-nisn')))?'':'none';
+      });
     }
 
     function filterKelasNilai(kelasVal) {
@@ -2188,11 +2386,11 @@
         }); keys = ['NISN', 'Mata_Pelajaran', 'Tahun_Ajaran', 'Semester']; sheetName = 'NilaiIntra';
       } else if (tipe === 'Koko') {
         const d = document.getElementById('input-dimensi').value, t = document.getElementById('input-tema').value; if(!d||!t) return showToast("Dimensi & Tema wajib diisi!", true);
-        document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr => { payload.push({ NISN: tr.getAttribute('data-nisn'), Dimensi_P5: d, Tema_Projek: t, Tahun_Ajaran: state.filter.ta, Semester: state.filter.sm, Capaian: tr.querySelector('.val-capaian').value, Deskripsi: tr.querySelector('.val-desc').value }); });
-        keys = ['NISN', 'Dimensi_P5', 'Tahun_Ajaran', 'Semester']; sheetName = 'NilaiKoko';
+        document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr => { if(tr.style.display !== 'none') payload.push({ NISN: tr.getAttribute('data-nisn'), Dimensi_P5: d, Tema_Projek: t, Tahun_Ajaran: state.filter.ta, Semester: state.filter.sm, Capaian: tr.querySelector('.val-capaian').value, Deskripsi: tr.querySelector('.val-desc').value }); });
+        keys = ['NISN', 'Dimensi_P5', 'Tema_Projek', 'Tahun_Ajaran', 'Semester']; sheetName = 'NilaiKoko';
       } else if (tipe === 'Ekstra') {
         const e = document.getElementById('input-ekskul').value; if(!e) return showToast("Nama Ekskul wajib diisi!", true);
-        document.querySelectorAll('#tbl-nilai-ekstra tr[data-nisn]').forEach(tr => { payload.push({ NISN: tr.getAttribute('data-nisn'), Nama_Ekskul: e, Tahun_Ajaran: state.filter.ta, Semester: state.filter.sm, Predikat: tr.querySelector('.val-predikat').value, Deskripsi: tr.querySelector('.val-desc').value }); });
+        document.querySelectorAll('#tbl-nilai-ekstra tr[data-nisn]').forEach(tr => { if(tr.style.display !== 'none') payload.push({ NISN: tr.getAttribute('data-nisn'), Nama_Ekskul: e, Tahun_Ajaran: state.filter.ta, Semester: state.filter.sm, Predikat: tr.querySelector('.val-predikat').value, Deskripsi: tr.querySelector('.val-desc').value }); });
         keys = ['NISN', 'Nama_Ekskul', 'Tahun_Ajaran', 'Semester']; sheetName = 'NilaiEkstra';
       }
       if(payload.length === 0) return showToast("Tidak ada data untuk disimpan.", true);
