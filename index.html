@@ -2180,7 +2180,10 @@
         rows = siswaBolehDinilai.map((s, i) => `
         <tr class="border-b border-slate-100 tr-nilai-siswa hover:bg-slate-50 transition-colors" data-nisn="${s.NISN}" data-kelas="${s.ID_Kelas}">
            <td class="py-3 px-4 text-center font-bold text-slate-500 nr-urut">${i+1}</td>
-           <td class="py-3 px-4 font-bold text-slate-800">${s.Nama_Lengkap}</td>
+           <td class="py-3 px-4 font-bold text-slate-800">
+             ${s.Nama_Lengkap}
+             <div class="status-nilai-terisi text-xs mt-1 text-slate-400">Belum ada nilai tersimpan</div>
+           </td>
            <td class="py-3 px-4">
               <select class="val-capaian w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white font-medium outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
                 <option value="Berkembang">C (Berkembang)</option>
@@ -2227,7 +2230,10 @@
         rows = siswaBolehDinilai.map((s, i) => `
         <tr class="border-b border-slate-100 tr-nilai-siswa hover:bg-slate-50 transition-colors" data-nisn="${s.NISN}" data-kelas="${s.ID_Kelas}">
            <td class="py-3 px-4 text-center font-bold text-slate-500 nr-urut">${i+1}</td>
-           <td class="py-3 px-4 font-bold text-slate-800">${s.Nama_Lengkap}</td>
+           <td class="py-3 px-4 font-bold text-slate-800">
+             ${s.Nama_Lengkap}
+             <div class="status-nilai-terisi text-xs mt-1 text-slate-400">Belum ada nilai tersimpan</div>
+           </td>
            <td class="py-3 px-4">
               <select class="val-predikat w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white font-medium outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
                  <option value="Sangat Baik">Sangat Baik</option>
@@ -2247,7 +2253,7 @@
                 ${opsiKelasFilter}
               </select>
             </div>
-            <div class="flex-2 min-w-[300px]"><label class="font-bold text-slate-700 block mb-1.5">Nama Ekstrakurikuler:</label><select id="input-ekskul" onchange="terapkanFilterEkstra()" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white font-medium"><option value="">-- Pilih Ekstrakurikuler --</option>${opsiEkstra}</select></div>
+            <div class="flex-2 min-w-[300px]"><label class="font-bold text-slate-700 block mb-1.5">Nama Ekstrakurikuler:</label><select id="input-ekskul" onchange="terapkanFilterEkstra()" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white font-medium"><option value="">-- Pilih Ekstrakurikuler --</option></select></div>
           </div>
           <div class="overflow-x-auto">
              <table class="w-full text-sm text-left">
@@ -2287,68 +2293,54 @@
     }
 
     function terapkanFilterKelompokP5() {
-      const id = document.getElementById('input-kelompok-p5')?.value || '';
-      const g = (state.db.kelompokProjek || []).find(x => String(x.ID_Projek) === String(id));
-      const d = document.getElementById('input-dimensi'), t = document.getElementById('input-tema');
-      if (d) d.value = g ? g.Dimensi_P5 : '';
-      if (t) t.value = g ? g.Tema_Projek : '';
+      const id = String(document.getElementById('input-kelompok-p5')?.value || '');
+      const kelompok = (state.db.kelompokProjek || []).filter(x => String(x.ID_Projek) === id);
+      const g = kelompok[0];
+      const d = document.getElementById('input-dimensi');
+      const t = document.getElementById('input-tema');
+      if (d) d.value = g ? (g.Dimensi_P5 || '') : '';
+      if (t) t.value = g ? (g.Tema_Projek || '') : '';
 
-      // NISN pada sheet NilaiKoko dapat tersimpan tanpa angka 0 di depan.
-      // Samakan seluruh pembandingan ke format 10 digit sebelum memfilter.
-      const members = new Set((state.db.kelompokProjek || [])
-        .filter(x => String(x.ID_Projek) === String(id))
-        .map(x => normalisasiNISNFront(x.NISN)));
-
-      document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr => {
-        const nisn = normalisasiNISNFront(tr.getAttribute('data-nisn'));
-        tr.style.display = id && members.has(nisn) ? '' : 'none';
-      });
-      muatNilaiTersimpanP5();
-    }
-
-    function muatNilaiTersimpanP5() {
-      const id = document.getElementById('input-kelompok-p5')?.value || '';
-      const g = (state.db.kelompokProjek || []).find(x => String(x.ID_Projek) === String(id));
+      const normalNisn = value => normalisasiNISNFront(value);
+      const anggota = new Set(kelompok.map(x => normalNisn(x.NISN)).filter(Boolean));
+      const ta = String(state.filter.ta || '').trim();
+      const sm = String(state.filter.sm || '').trim();
       const dimensi = String(g?.Dimensi_P5 || '').trim();
       const tema = String(g?.Tema_Projek || '').trim();
-      const norm = v => String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
-      const data = state.db.nilaiKoko || [];
 
       document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr => {
-        const nisn = normalisasiNISNFront(tr.getAttribute('data-nisn'));
-        const item = data.filter(x =>
-          normalisasiNISNFront(x.NISN) === nisn &&
-          norm(x.Tahun_Ajaran) === norm(state.filter.ta) &&
-          norm(x.Semester) === norm(state.filter.sm) &&
-          norm(x.Dimensi_P5) === norm(dimensi) &&
-          norm(x.Tema_Projek) === norm(tema)
-        ).slice(-1)[0];
-        const select = tr.querySelector('.val-capaian');
-        const desc = tr.querySelector('.val-desc');
-        if (item) {
-          if (select) select.value = String(item.Capaian || '').trim();
-          if (desc) desc.value = item.Deskripsi || '';
-          tandaiStatusNilai(tr, true);
+        const nisn = normalNisn(tr.getAttribute('data-nisn'));
+        const visible = !!id && anggota.has(nisn);
+        tr.style.display = visible ? '' : 'none';
+        if (!visible) return;
+
+        const nilai = (state.db.nilaiKoko || []).find(x =>
+          normalNisn(x.NISN) === nisn &&
+          String(x.Tahun_Ajaran || '').trim() === ta &&
+          String(x.Semester || '').trim() === sm &&
+          String(x.Dimensi_P5 || '').trim() === dimensi &&
+          String(x.Tema_Projek || '').trim() === tema
+        );
+
+        const capaian = tr.querySelector('.val-capaian');
+        const deskripsi = tr.querySelector('.val-desc');
+        const status = tr.querySelector('.status-nilai-terisi');
+        if (nilai) {
+          if (capaian) capaian.value = nilai.Capaian || 'Mahir';
+          if (deskripsi) deskripsi.value = nilai.Deskripsi || '';
+          if (status) {
+            status.textContent = '✓ Nilai sudah tersimpan';
+            status.className = 'status-nilai-terisi text-xs mt-1 text-green-600 font-semibold';
+          }
         } else {
-          if (select) select.value = 'Mahir';
-          if (desc) desc.value = '';
-          tandaiStatusNilai(tr, false);
+          if (capaian) capaian.value = 'Mahir';
+          if (deskripsi) deskripsi.value = '';
+          if (status) {
+            status.textContent = 'Belum ada nilai tersimpan';
+            status.className = 'status-nilai-terisi text-xs mt-1 text-slate-400';
+          }
         }
       });
-    }
-
-    function tandaiStatusNilai(tr, sudah) {
-      const nama = tr.querySelector('td:nth-child(2)');
-      if (!nama) return;
-      let badge = nama.querySelector('.status-nilai-tersimpan');
-      if (!badge) {
-        badge = document.createElement('div');
-        badge.className = 'status-nilai-tersimpan text-xs mt-1';
-        nama.appendChild(badge);
-      }
-      badge.className = 'status-nilai-tersimpan text-xs mt-1 font-semibold ' +
-        (sudah ? 'text-emerald-600' : 'text-slate-400');
-      badge.textContent = sudah ? '✓ Nilai sudah tersimpan' : 'Belum ada nilai tersimpan';
     }
 
     function muatPilihanEkstra() {
@@ -2363,44 +2355,50 @@
     }
 
     function terapkanFilterEkstra() {
-      const kelasId = document.getElementById('filter-kelas-ekstra')?.value || '';
-      const ekskul = document.getElementById('input-ekskul')?.value || '';
-      const assigned = new Set((state.db.pemetaanEkstra || []).filter(x =>
-        String(x.Tahun_Ajaran) === String(state.filter.ta) &&
-        String(x.Semester) === String(state.filter.sm) &&
-        String(x.ID_Kelas) === String(kelasId) &&
-        String(x.Nama_Ekskul).trim() === String(ekskul).trim() &&
-        String(x.Status || 'Aktif').toLowerCase() === 'aktif'
-      ).map(x => normalisasiNISNFront(x.NISN)));
-      document.querySelectorAll('#tbl-nilai-ekstra tr[data-nisn]').forEach(tr => {
-        const nisn = normalisasiNISNFront(tr.getAttribute('data-nisn'));
-        tr.style.display = ekskul && assigned.has(nisn) ? '' : 'none';
-      });
-      muatNilaiTersimpanEkstra();
-    }
-
-    function muatNilaiTersimpanEkstra() {
+      const kelasId = String(document.getElementById('filter-kelas-ekstra')?.value || '');
       const ekskul = String(document.getElementById('input-ekskul')?.value || '').trim();
-      const norm = v => String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
-      const data = state.db.nilaiEkstra || [];
+      const normalNisn = value => normalisasiNISNFront(value);
+      const ta = String(state.filter.ta || '').trim();
+      const sm = String(state.filter.sm || '').trim();
+
+      const assigned = new Set((state.db.pemetaanEkstra || []).filter(x =>
+        String(x.Tahun_Ajaran || '').trim() === ta &&
+        String(x.Semester || '').trim() === sm &&
+        String(x.ID_Kelas || '').trim() === kelasId &&
+        String(x.Nama_Ekskul || '').trim() === ekskul &&
+        String(x.Status || 'Aktif').trim().toLowerCase() === 'aktif'
+      ).map(x => normalNisn(x.NISN)).filter(Boolean));
+
       document.querySelectorAll('#tbl-nilai-ekstra tr[data-nisn]').forEach(tr => {
-        const nisn = normalisasiNISNFront(tr.getAttribute('data-nisn'));
-        const item = data.filter(x =>
-          normalisasiNISNFront(x.NISN) === nisn &&
-          norm(x.Tahun_Ajaran) === norm(state.filter.ta) &&
-          norm(x.Semester) === norm(state.filter.sm) &&
-          norm(x.Nama_Ekskul) === norm(ekskul)
-        ).slice(-1)[0];
+        const nisn = normalNisn(tr.getAttribute('data-nisn'));
+        const visible = !!ekskul && assigned.has(nisn);
+        tr.style.display = visible ? '' : 'none';
+        if (!visible) return;
+
+        const nilai = (state.db.nilaiEkstra || []).find(x =>
+          normalNisn(x.NISN) === nisn &&
+          String(x.Tahun_Ajaran || '').trim() === ta &&
+          String(x.Semester || '').trim() === sm &&
+          String(x.Nama_Ekskul || '').trim() === ekskul
+        );
+
         const predikat = tr.querySelector('.val-predikat');
-        const desc = tr.querySelector('.val-desc');
-        if (item) {
-          if (predikat) predikat.value = String(item.Predikat || '').trim();
-          if (desc) desc.value = item.Deskripsi || '';
-          tandaiStatusNilai(tr, true);
+        const deskripsi = tr.querySelector('.val-desc');
+        const status = tr.querySelector('.status-nilai-terisi');
+        if (nilai) {
+          if (predikat) predikat.value = nilai.Predikat || 'Baik';
+          if (deskripsi) deskripsi.value = nilai.Deskripsi || '';
+          if (status) {
+            status.textContent = '✓ Nilai sudah tersimpan';
+            status.className = 'status-nilai-terisi text-xs mt-1 text-green-600 font-semibold';
+          }
         } else {
           if (predikat) predikat.value = 'Baik';
-          if (desc) desc.value = '';
-          tandaiStatusNilai(tr, false);
+          if (deskripsi) deskripsi.value = '';
+          if (status) {
+            status.textContent = 'Belum ada nilai tersimpan';
+            status.className = 'status-nilai-terisi text-xs mt-1 text-slate-400';
+          }
         }
       });
     }
