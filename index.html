@@ -579,6 +579,32 @@
       return proxy;
     })();
 
+    // Ambil data cetak langsung dari Firestore melalui Worker setiap kali dokumen dicetak.
+    // Tidak mengubah format HTML/cetak yang sudah ada.
+    async function refreshPrintDataFromFirestore(filters = {}) {
+      const token = localStorage.getItem('eraport_session_token') || '';
+      if (!token) throw new Error('Sesi login tidak ditemukan. Silakan login kembali.');
+      const response = await fetch(WORKER_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'getPrintData', args: [filters], token })
+      });
+      const raw = await response.text();
+      let result;
+      try { result = JSON.parse(raw); }
+      catch (_) { throw new Error('Respons data cetak dari server bukan JSON.'); }
+      if (!response.ok || !result || result.success !== true || !result.data) {
+        throw new Error((result && result.message) || 'Gagal mengambil data cetak dari Firestore.');
+      }
+      const d = result.data;
+      // Ganti hanya koleksi yang diperlukan untuk cetak; data input halaman lain tetap utuh.
+      ['kelas','siswa','users','kehadiran','nilaiIntra','nilaiKoko','nilaiEkstra','catatanWali','masterMapel'].forEach(k => {
+        if (Array.isArray(d[k])) state.db[k] = d[k];
+      });
+      if (d.pengaturan && typeof d.pengaturan === 'object') state.db.pengaturan = d.pengaturan;
+      return true;
+    }
+
     let state = { 
       user: null, 
       db: { pengaturan: {}, kelas: [], siswa: [], kehadiran: [], nilaiIntra: [], nilaiKoko: [], nilaiEkstra: [], catatanWali: [], users: [], pemetaanIntra: [], dimensiP5: [], temaProjek: [], kelompokProjek: [], masterEkstra: [], pemetaanEkstra: [] }, 
@@ -3316,7 +3342,9 @@ function renderCatatan(container) {
       }, 500);
     }
 
-    function cetakLegerSiswa(nisn) {
+    async function cetakLegerSiswa(nisn) {
+      try { await refreshPrintDataFromFirestore({ nisn: String(nisn) }); }
+      catch (error) { showToast('Data cetak gagal dimuat dari Firestore: ' + (error.message || error), true); return; }
       const s = (state.db.siswa || []).find(x => String(x.NISN) === String(nisn));
       if (!s) return showToast('Data siswa tidak ditemukan.', true);
 
@@ -3387,7 +3415,9 @@ function renderCatatan(container) {
       tampilkanCetakLeger(html);
     }
 
-    function cetakLegerKelas(kelasVal) {
+    async function cetakLegerKelas(kelasVal) {
+      try { await refreshPrintDataFromFirestore({ kelasId: String(kelasVal) }); }
+      catch (error) { showToast('Data cetak gagal dimuat dari Firestore: ' + (error.message || error), true); return; }
       if (!kelasVal || kelasVal === 'all') {
         return showToast('Silakan pilih satu kelas terlebih dahulu untuk mencetak leger per kelas.', true);
       }
@@ -3479,7 +3509,9 @@ function renderCatatan(container) {
       tampilkanCetakLeger(html);
     }
 
-    function cetakSampul(nisn) {
+    async function cetakSampul(nisn) {
+      try { await refreshPrintDataFromFirestore({ nisn: String(nisn) }); }
+      catch (error) { showToast('Data cetak gagal dimuat dari Firestore: ' + (error.message || error), true); return; }
       const s = state.db.siswa.find(x => x.NISN == nisn), p = state.db.pengaturan || {};
       const nipKepsek = p.NIP_Kepsek && p.NIP_Kepsek !== '-' ? `NIP. ${p.NIP_Kepsek}` : '';
       
@@ -3559,7 +3591,9 @@ function renderCatatan(container) {
       setTimeout(() => { window.print(); setTimeout(() => { pa.classList.add('hidden'); pa.innerHTML = ''; }, 3000); }, 500);
     }
 
-    function cetakRaport(nisn) {
+    async function cetakRaport(nisn) {
+      try { await refreshPrintDataFromFirestore({ nisn: String(nisn) }); }
+      catch (error) { showToast('Data cetak gagal dimuat dari Firestore: ' + (error.message || error), true); return; }
       const s = state.db.siswa.find(x => x.NISN == nisn), kls = state.db.kelas.find(x => x.ID_Kelas == s.ID_Kelas) || {}, p = state.db.pengaturan || {};
       
       let wkUsername = kls.Wali_Kelas_Username || '';
