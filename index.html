@@ -416,6 +416,10 @@
           <button onclick="nav('monitor-nilai')" class="nav-btn w-full text-left py-2.5 px-3 rounded-lg hover:bg-slate-800 hover:text-white transition-all flex items-center gap-3 font-medium" data-target="monitor-nilai"><i class="fas fa-clipboard-check w-5 text-center text-emerald-400"></i> Monitoring Nilai Guru</button>
           <button onclick="nav('pemetaan')" class="nav-btn w-full text-left py-2.5 px-3 rounded-lg hover:bg-slate-800 hover:text-white transition-all flex items-center gap-3 font-medium" data-target="pemetaan"><i class="fas fa-diagram-project w-5 text-center text-amber-400"></i> Pemetaan Akademik</button>
         </div>
+        <div id="menu-monitor-wali" class="hidden">
+          <p class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 mt-8">Wali Kelas</p>
+          <button onclick="nav('monitor-nilai')" class="nav-btn w-full text-left py-2.5 px-3 rounded-lg hover:bg-slate-800 hover:text-white transition-all flex items-center gap-3 font-medium" data-target="monitor-nilai"><i class="fas fa-clipboard-check w-5 text-center text-emerald-400"></i> Monitoring Nilai Guru</button>
+        </div>
       </nav>
       
       <div class="p-5 border-t border-slate-800 bg-slate-950">
@@ -744,6 +748,8 @@
           const role = String(res.user.role).trim().toLowerCase();
           if(role === 'admin') {
               document.getElementById('menu-admin').classList.remove('hidden');
+          } else if (role === 'wali kelas') {
+              document.getElementById('menu-monitor-wali').classList.remove('hidden');
           } else if (role === 'guru') {
               ['menu-siswa', 'menu-kehadiran', 'menu-catatan', 'menu-cetak'].forEach(id => {
                 const el = document.getElementById(id);
@@ -792,6 +798,8 @@
         loginError.classList.add('hidden');
       }
       if (adminMenu) adminMenu.classList.add('hidden');
+      const menuMonitorWali = document.getElementById('menu-monitor-wali');
+      if (menuMonitorWali) menuMonitorWali.classList.add('hidden');
 
       // Pulihkan menu yang mungkin disembunyikan saat login sebagai Guru,
       // sehingga login berikutnya dapat menentukan hak akses dari awal.
@@ -1167,8 +1175,8 @@
 
     function renderMonitoringNilai(container) {
       const role = String(state.user && state.user.role || '').trim().toLowerCase();
-      if (role !== 'admin') {
-        container.innerHTML = `<div class="p-6 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl shadow-sm font-bold flex items-center gap-3"><i class="fas fa-lock text-rose-500 text-xl"></i>Akses ditolak. Menu Monitoring Nilai Guru hanya untuk Administrator.</div>`;
+      if (role !== 'admin' && role !== 'wali kelas') {
+        container.innerHTML = `<div class="p-6 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl shadow-sm font-bold flex items-center gap-3"><i class="fas fa-lock text-rose-500 text-xl"></i>Akses ditolak. Menu Monitoring Nilai Guru hanya untuk Administrator dan Wali Kelas.</div>`;
         return;
       }
 
@@ -1231,7 +1239,7 @@
         .withFailureHandler(function(err) {
           container.innerHTML = `<div class="p-6 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl font-bold">Gagal membaca monitoring nilai: ${escapeHtml((err && err.message) || 'Error server.')}</div>`;
         })
-        .getMonitoringNilaiGuru(ta, sm);
+        .getMonitoringNilaiGuru(ta, sm, state.user.username);
     }
 
     function renderDashboard(container) {
@@ -3906,6 +3914,8 @@ function renderCatatan(container) {
           const role = String(res.user.role).trim().toLowerCase();
           if (role === 'admin') {
             document.getElementById('menu-admin').classList.remove('hidden');
+          } else if (role === 'wali kelas') {
+            document.getElementById('menu-monitor-wali').classList.remove('hidden');
           } else if (role === 'guru') {
             ['menu-siswa','menu-kehadiran','menu-catatan','menu-cetak'].forEach(id => {
               const el = document.getElementById(id);
