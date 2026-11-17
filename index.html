@@ -2314,7 +2314,7 @@
               </select>
             </div>
             <div class="flex-1 min-w-[200px]"><label class="font-bold text-slate-700 block mb-1.5">Kelompok Projek:</label><select id="input-kelompok-p5" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white" onchange="terapkanFilterKelompokP5()"><option value="">-- Pilih Kelompok --</option></select></div>
-            <div class="flex-1 min-w-[220px]"><label class="font-bold text-slate-700 block mb-1.5">Dimensi P5 (boleh pilih lebih dari satu):</label><input type="hidden" id="input-dimensi" value=""><div id="input-dimensi-options" class="w-full border border-slate-300 rounded-lg p-2 bg-white min-h-[42px] max-h-36 overflow-y-auto text-sm"><span class="text-slate-400">Pilih kelompok terlebih dahulu</span></div><p class="text-xs text-slate-500 mt-1">Centang dua dimensi atau lebih jika kelompok mengerjakan beberapa dimensi.</p></div>
+            <div class="flex-1 min-w-[220px]"><label class="font-bold text-slate-700 block mb-1.5">Dimensi P5 dari Pemetaan Kelompok:</label><input type="hidden" id="input-dimensi" value=""><div id="input-dimensi-options" class="w-full border border-slate-300 rounded-lg p-2 bg-slate-50 min-h-[42px] text-sm"><span class="text-slate-400">Pilih kelompok untuk memuat dimensi otomatis</span></div><p class="text-xs text-emerald-700 mt-1">Semua dimensi yang dipetakan pada kelompok akan digunakan otomatis.</p></div>
             <div class="flex-1 min-w-[220px]"><label class="font-bold text-slate-700 block mb-1.5">Tema Projek:</label><input type="text" id="input-tema" readonly class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 font-medium" placeholder="Terisi dari pemetaan Admin"></div>
           </div>
           <div class="overflow-x-auto">
@@ -2410,33 +2410,29 @@
       const hidden=document.getElementById('input-dimensi');
       const box=document.getElementById('input-dimensi-options');
       const t=document.getElementById('input-tema');
+      // Dimensi selalu diambil otomatis dari pemetaan kelompok projek.
+      // Satu kelompok dapat memiliki beberapa dimensi dalam satu atau beberapa baris.
       const dimensi=[...new Set(groupRows.flatMap(x=>String(x.Dimensi_P5||'').split(';').map(v=>v.trim()).filter(Boolean)))];
-      const sebelumnya=String(hidden?.value||'').split(';').map(v=>v.trim()).filter(Boolean);
+      if(hidden) hidden.value=dimensi.join('; ');
       if(box){
-        if(!id || !dimensi.length){
-          box.innerHTML='<span class="text-slate-400">Pilih kelompok terlebih dahulu</span>';
-        } else {
-          const tetap=sebelumnya.filter(v=>dimensi.includes(v));
-          const terpilih= new Set(tetap.length?tetap:[dimensi[0]]);
-          box.innerHTML=dimensi.map((v,i)=>`<label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-blue-50 cursor-pointer"><input type="checkbox" class="input-dimensi-check accent-blue-600" value="${escapeHtml(v)}" ${terpilih.has(v)?'checked':''} onchange="terapkanFilterKelompokP5()"><span>${escapeHtml(v)}</span></label>`).join('');
-        }
+        box.innerHTML=(!id || !dimensi.length)
+          ? '<span class="text-slate-400">Pilih kelompok yang sudah memiliki pemetaan dimensi.</span>'
+          : '<div class="flex flex-wrap gap-2">'+dimensi.map(v=>`<span class="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-3 py-1 font-semibold">${escapeHtml(v)}</span>`).join('')+'</div>';
       }
-      const dimTerpilih=box?[...box.querySelectorAll('.input-dimensi-check:checked')].map(x=>x.value):[];
-      if(hidden) hidden.value=dimTerpilih.join('; ');
       if(t)t.value=g?g.Tema_Projek:'';
       const members=new Set(groupRows.filter(x=>{
         const dims=String(x.Dimensi_P5||'').split(';').map(v=>v.trim()).filter(Boolean);
-        return dimTerpilih.some(d=>dims.includes(d));
+        return dimensi.some(d=>dims.includes(d));
       }).map(x=>normalisasiNISNFront(x.NISN)));
       document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr=>{
         const nisn=normalisasiNISNFront(tr.getAttribute('data-nisn'));
-        const visible=!!id&&dimTerpilih.length>0&&members.has(nisn);
+        const visible=!!id&&dimensi.length>0&&members.has(nisn);
         tr.style.display=visible?'':'none';
         const saved=(state.db.nilaiKoko||[]).find(x=>
           normalisasiNISNFront(x.NISN)===nisn &&
           (String(x.Tahun_Ajaran||'')===String(state.filter.ta||'') || !String(x.Tahun_Ajaran||'').trim()) &&
           (String(x.Semester||'')===String(state.filter.sm||'') || !String(x.Semester||'').trim()) &&
-          dimTerpilih.includes(String(x.Dimensi_P5||'').trim()) &&
+          dimensi.includes(String(x.Dimensi_P5||'').trim()) &&
           String(x.Tema_Projek||'').trim()===String(g?.Tema_Projek||'').trim()
         );
         const capaian=tr.querySelector('.val-capaian');
@@ -2445,7 +2441,7 @@
         if(saved){
           if(capaian)capaian.value=String(saved.Capaian||'Mahir');
           if(deskripsi)deskripsi.value=saved.Deskripsi||'';
-          if(status){status.textContent='✓ Nilai sudah tersimpan pada minimal satu dimensi terpilih — simpan untuk memperbarui semua dimensi terpilih';status.className='status-nilai-terisi text-xs font-semibold mt-1 text-emerald-700';}
+          if(status){status.textContent='✓ Nilai sudah tersimpan pada minimal satu dimensi kelompok';status.className='status-nilai-terisi text-xs font-semibold mt-1 text-emerald-700';}
         }else{
           if(capaian)capaian.value='Mahir';
           if(deskripsi)deskripsi.value='';
@@ -2609,9 +2605,9 @@
           }
         }); keys = ['NISN', 'Mata_Pelajaran', 'Tahun_Ajaran', 'Semester']; sheetName = 'NilaiIntra';
       } else if (tipe === 'Koko') {
-        const dimensiTerpilih = Array.from(document.querySelectorAll('#input-dimensi-options .input-dimensi-check:checked')).map(x => x.value);
+        const dimensiTerpilih = String(document.getElementById('input-dimensi')?.value || '').split(';').map(x => x.trim()).filter(Boolean);
         const t = document.getElementById('input-tema').value;
-        if(!dimensiTerpilih.length||!t) return showToast("Pilih minimal satu Dimensi P5 dan Tema Projek!", true);
+        if(!dimensiTerpilih.length||!t) return showToast("Pilih kelompok projek yang sudah dipetakan dimensinya dan Tema Projek!", true);
         document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr => {
           if(tr.style.display !== 'none') dimensiTerpilih.forEach(d => payload.push({
             NISN: tr.getAttribute('data-nisn'), Dimensi_P5: d, Tema_Projek: t,
