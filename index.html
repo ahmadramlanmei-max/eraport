@@ -698,15 +698,38 @@
       return Object.keys(getPenugasanMapelKelasGuru());
     }
 
-    function showLoading(show, text = 'Memuat...') { 
+    // Loading overlay diperbaiki: tutup langsung saat proses selesai.
+    // Timer lama 300 ms dapat bertabrakan dengan pemanggilan loading berikutnya.
+    let loadingWatchdog = null;
+    let loadingRunId = 0;
+    function showLoading(show, text = 'Memuat...') {
       const loader = document.getElementById('loading-screen');
-      document.getElementById('loading-text').innerText = text; 
-      if(show) {
+      const label = document.getElementById('loading-text');
+      if (!loader) return;
+      if (label) label.innerText = text;
+      if (show) {
+        const runId = ++loadingRunId;
         loader.classList.remove('hidden');
-        setTimeout(() => loader.style.opacity = '1', 10);
+        loader.style.display = 'flex';
+        loader.style.opacity = '1';
+        loader.style.pointerEvents = 'auto';
+        if (loadingWatchdog) clearTimeout(loadingWatchdog);
+        // Pengaman UI: jangan biarkan overlay menutupi dashboard tanpa batas.
+        // Tidak membatalkan request; hanya membuka kembali antarmuka.
+        loadingWatchdog = setTimeout(() => {
+          if (runId === loadingRunId) {
+            loader.style.opacity = '0';
+            loader.style.pointerEvents = 'none';
+            loader.classList.add('hidden');
+          }
+        }, 30000);
       } else {
+        ++loadingRunId;
+        if (loadingWatchdog) clearTimeout(loadingWatchdog);
+        loadingWatchdog = null;
         loader.style.opacity = '0';
-        setTimeout(() => loader.classList.add('hidden'), 300);
+        loader.style.pointerEvents = 'none';
+        loader.classList.add('hidden');
       }
     }
     
@@ -825,7 +848,7 @@
         return;
       }
       document.getElementById('offline-badge').classList.add('hidden');
-      showLoading(true, "Memuat data...");
+      showLoading(true, "Membangun Data Spreadsheet...");
       
       google.script.run.withSuccessHandler(res => {
         showLoading(false);
@@ -840,8 +863,9 @@
             
             renderFilterGlobal();
 
-            if(isRefresh) showToast("Data berhasil ditarik."); 
-            nav(state.currentView); 
+            if(isRefresh) showToast("Data berhasil ditarik.");
+            nav(state.currentView);
+            showLoading(false);
         } else { 
           showToast(res.message, true); 
         }
