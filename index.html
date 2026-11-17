@@ -556,7 +556,7 @@
             fetch(WORKER_API_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: property, args })
+              body: JSON.stringify({ action: property, args, token: localStorage.getItem('eraport_session_token') || '' })
             })
             .then(async response => {
               const raw = await response.text();
@@ -738,6 +738,7 @@
         if (res.success) {
           errEl.classList.add('hidden'); 
           state.user = res.user;
+          if (res.token) localStorage.setItem('eraport_session_token', res.token);
           document.getElementById('user-info').innerText = `${res.user.nama} (${res.user.role})`;
           
           const role = String(res.user.role).trim().toLowerCase();
@@ -766,7 +767,12 @@
     }
 
     function logout() {
-      // Keluar tanpa me-refresh halaman: kembalikan tampilan ke halaman login.
+      // Cabut hanya sesi pada perangkat ini; sesi perangkat lain tetap aktif.
+      const activeToken = localStorage.getItem('eraport_session_token') || '';
+      if (activeToken) {
+        google.script.run.withSuccessHandler(() => {}).withFailureHandler(() => {}).logoutSession();
+      }
+      localStorage.removeItem('eraport_session_token');
       state.user = null;
       state.currentView = 'dashboard';
 
@@ -3861,6 +3867,38 @@ function renderCatatan(container) {
         content.innerHTML = `<div class="text-rose-500 font-bold py-8">Gagal menarik data: ${err.message}</div>`;
       }).getRiwayatSiswa(nisn);
     }
+
+    // Pulihkan sesi secara otomatis setelah halaman dimuat ulang atau browser dibuka kembali.
+    function restoreLoginSession() {
+      const token = localStorage.getItem('eraport_session_token');
+      if (!token) return;
+      showLoading(true, "Memeriksa Sesi Login...");
+      google.script.run.withSuccessHandler(res => {
+        if (res && res.success && res.user) {
+          state.user = res.user;
+          document.getElementById('user-info').innerText = `${res.user.nama} (${res.user.role})`;
+          const role = String(res.user.role).trim().toLowerCase();
+          if (role === 'admin') {
+            document.getElementById('menu-admin').classList.remove('hidden');
+          } else if (role === 'guru') {
+            ['menu-siswa','menu-kehadiran','menu-catatan','menu-cetak'].forEach(id => {
+              const el = document.getElementById(id);
+              if (el) el.classList.add('hidden');
+            });
+          }
+          document.getElementById('login-screen').classList.add('hidden');
+          document.getElementById('main-app').classList.remove('hidden');
+          fetchData();
+        } else {
+          localStorage.removeItem('eraport_session_token');
+          showLoading(false);
+        }
+      }).withFailureHandler(() => {
+        showLoading(false);
+      }).validateSession();
+    }
+
+    document.addEventListener('DOMContentLoaded', restoreLoginSession);
   </script>
 </body>
 </html>
