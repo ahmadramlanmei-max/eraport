@@ -557,13 +557,10 @@
             successHandler = (res) => console.log('Respons Worker:', res);
             failureHandler = (err) => console.error('Kesalahan Worker:', err);
 
-            const controller = new AbortController();
-            const requestTimer = setTimeout(() => controller.abort(), 90000);
             fetch(WORKER_API_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: property, args, token: localStorage.getItem('eraport_session_token') || '' }),
-              signal: controller.signal
+              body: JSON.stringify({ action: property, args, token: localStorage.getItem('eraport_session_token') || '' })
             })
             .then(async response => {
               const raw = await response.text();
@@ -573,8 +570,8 @@
               if (!response.ok) throw new Error(result.message || `HTTP ${response.status}`);
               return result;
             })
-            .then(result => { clearTimeout(requestTimer); onSuccess(result); })
-            .catch(error => { clearTimeout(requestTimer); onFailure(error && error.name === 'AbortError' ? new Error('Permintaan ke server melebihi 90 detik. Periksa log Worker dan Apps Script; jangan ulangi penyimpanan sebelum memastikan data belum masuk.') : error); });
+            .then(result => onSuccess(result))
+            .catch(error => onFailure(error));
           };
         }
       });
@@ -1845,7 +1842,7 @@
               payload.push({
                 NISN: nisn,
                 Dimensi_P5:String(r.Dimensi_P5 || '').trim() ||
-                  String((document.getElementById('input-dimensi') || {}).value || '').trim(),
+                  String((document.getElementById('input-dimensi') || {}).value || '').split(';')[0].trim(),
                 Tema_Projek:String(r.Tema_Projek || '').trim() ||
                   String((document.getElementById('input-tema') || {}).value || '').trim(),
                 Tahun_Ajaran:String(r.Tahun_Ajaran || '').trim() || ta,
@@ -2062,7 +2059,7 @@
           String(s.Jenis_Kelamin || ''),
           String(s.ID_Kelas || ''),
           namaKelas(s.ID_Kelas),
-          String((document.getElementById('input-dimensi') || {}).value || ''),
+          String((document.getElementById('input-dimensi') || {}).value || '').split(';')[0].trim(),
           String((document.getElementById('input-tema') || {}).value || ''),
           String(state.filter && state.filter.ta || ''),
           String(state.filter && state.filter.sm || ''),
@@ -2317,7 +2314,7 @@
               </select>
             </div>
             <div class="flex-1 min-w-[200px]"><label class="font-bold text-slate-700 block mb-1.5">Kelompok Projek:</label><select id="input-kelompok-p5" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white" onchange="terapkanFilterKelompokP5()"><option value="">-- Pilih Kelompok --</option></select></div>
-            <div class="flex-1 min-w-[200px]"><label class="font-bold text-slate-700 block mb-1.5">Dimensi P5:</label><select id="input-dimensi" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white font-medium" onchange="terapkanFilterKelompokP5()"><option value="">Pilih kelompok terlebih dahulu</option></select></div>
+            <div class="flex-1 min-w-[220px]"><label class="font-bold text-slate-700 block mb-1.5">Dimensi P5 (boleh pilih lebih dari satu):</label><input type="hidden" id="input-dimensi" value=""><div id="input-dimensi-options" class="w-full border border-slate-300 rounded-lg p-2 bg-white min-h-[42px] max-h-36 overflow-y-auto text-sm"><span class="text-slate-400">Pilih kelompok terlebih dahulu</span></div><p class="text-xs text-slate-500 mt-1">Centang dua dimensi atau lebih jika kelompok mengerjakan beberapa dimensi.</p></div>
             <div class="flex-1 min-w-[220px]"><label class="font-bold text-slate-700 block mb-1.5">Tema Projek:</label><input type="text" id="input-tema" readonly class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 font-medium" placeholder="Terisi dari pemetaan Admin"></div>
           </div>
           <div class="overflow-x-auto">
@@ -2410,25 +2407,36 @@
       const id=document.getElementById('input-kelompok-p5')?.value||'';
       const groupRows=(state.db.kelompokProjek||[]).filter(x=>String(x.ID_Projek)===String(id));
       const g=groupRows[0];
-      const d=document.getElementById('input-dimensi'),t=document.getElementById('input-tema');
+      const hidden=document.getElementById('input-dimensi');
+      const box=document.getElementById('input-dimensi-options');
+      const t=document.getElementById('input-tema');
       const dimensi=[...new Set(groupRows.flatMap(x=>String(x.Dimensi_P5||'').split(';').map(v=>v.trim()).filter(Boolean)))];
-      const dimLama=d?.value||'';
-      if(d){
-        d.innerHTML='<option value="">-- Pilih Dimensi --</option>'+dimensi.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
-        d.value=dimensi.includes(dimLama)?dimLama:(dimensi[0]||'');
+      const sebelumnya=String(hidden?.value||'').split(';').map(v=>v.trim()).filter(Boolean);
+      if(box){
+        if(!id || !dimensi.length){
+          box.innerHTML='<span class="text-slate-400">Pilih kelompok terlebih dahulu</span>';
+        } else {
+          const tetap=sebelumnya.filter(v=>dimensi.includes(v));
+          const terpilih= new Set(tetap.length?tetap:[dimensi[0]]);
+          box.innerHTML=dimensi.map((v,i)=>`<label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-blue-50 cursor-pointer"><input type="checkbox" class="input-dimensi-check accent-blue-600" value="${escapeHtml(v)}" ${terpilih.has(v)?'checked':''} onchange="terapkanFilterKelompokP5()"><span>${escapeHtml(v)}</span></label>`).join('');
+        }
       }
-      const dimTerpilih=d?.value||'';
+      const dimTerpilih=box?[...box.querySelectorAll('.input-dimensi-check:checked')].map(x=>x.value):[];
+      if(hidden) hidden.value=dimTerpilih.join('; ');
       if(t)t.value=g?g.Tema_Projek:'';
-      const members=new Set(groupRows.filter(x=>String(x.Dimensi_P5||'').trim()===dimTerpilih).map(x=>normalisasiNISNFront(x.NISN)));
+      const members=new Set(groupRows.filter(x=>{
+        const dims=String(x.Dimensi_P5||'').split(';').map(v=>v.trim()).filter(Boolean);
+        return dimTerpilih.some(d=>dims.includes(d));
+      }).map(x=>normalisasiNISNFront(x.NISN)));
       document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr=>{
         const nisn=normalisasiNISNFront(tr.getAttribute('data-nisn'));
-        const visible=!!id&&!!dimTerpilih&&members.has(nisn);
+        const visible=!!id&&dimTerpilih.length>0&&members.has(nisn);
         tr.style.display=visible?'':'none';
         const saved=(state.db.nilaiKoko||[]).find(x=>
           normalisasiNISNFront(x.NISN)===nisn &&
           (String(x.Tahun_Ajaran||'')===String(state.filter.ta||'') || !String(x.Tahun_Ajaran||'').trim()) &&
           (String(x.Semester||'')===String(state.filter.sm||'') || !String(x.Semester||'').trim()) &&
-          String(x.Dimensi_P5||'').trim()===String(dimTerpilih).trim() &&
+          dimTerpilih.includes(String(x.Dimensi_P5||'').trim()) &&
           String(x.Tema_Projek||'').trim()===String(g?.Tema_Projek||'').trim()
         );
         const capaian=tr.querySelector('.val-capaian');
@@ -2437,7 +2445,7 @@
         if(saved){
           if(capaian)capaian.value=String(saved.Capaian||'Mahir');
           if(deskripsi)deskripsi.value=saved.Deskripsi||'';
-          if(status){status.textContent='✓ Nilai sudah tersimpan — perubahan akan memperbarui nilai ini';status.className='status-nilai-terisi text-xs font-semibold mt-1 text-emerald-700';}
+          if(status){status.textContent='✓ Nilai sudah tersimpan pada minimal satu dimensi terpilih — simpan untuk memperbarui semua dimensi terpilih';status.className='status-nilai-terisi text-xs font-semibold mt-1 text-emerald-700';}
         }else{
           if(capaian)capaian.value='Mahir';
           if(deskripsi)deskripsi.value='';
@@ -2601,8 +2609,17 @@
           }
         }); keys = ['NISN', 'Mata_Pelajaran', 'Tahun_Ajaran', 'Semester']; sheetName = 'NilaiIntra';
       } else if (tipe === 'Koko') {
-        const d = document.getElementById('input-dimensi').value, t = document.getElementById('input-tema').value; if(!d||!t) return showToast("Dimensi & Tema wajib diisi!", true);
-        document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr => { if(tr.style.display !== 'none') payload.push({ NISN: tr.getAttribute('data-nisn'), Dimensi_P5: d, Tema_Projek: t, Tahun_Ajaran: state.filter.ta, Semester: state.filter.sm, Capaian: tr.querySelector('.val-capaian').value, Deskripsi: tr.querySelector('.val-desc').value }); });
+        const dimensiTerpilih = Array.from(document.querySelectorAll('#input-dimensi-options .input-dimensi-check:checked')).map(x => x.value);
+        const t = document.getElementById('input-tema').value;
+        if(!dimensiTerpilih.length||!t) return showToast("Pilih minimal satu Dimensi P5 dan Tema Projek!", true);
+        document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr => {
+          if(tr.style.display !== 'none') dimensiTerpilih.forEach(d => payload.push({
+            NISN: tr.getAttribute('data-nisn'), Dimensi_P5: d, Tema_Projek: t,
+            Tahun_Ajaran: state.filter.ta, Semester: state.filter.sm,
+            Capaian: tr.querySelector('.val-capaian').value,
+            Deskripsi: tr.querySelector('.val-desc').value
+          }));
+        });
         keys = ['NISN', 'Dimensi_P5', 'Tema_Projek', 'Tahun_Ajaran', 'Semester']; sheetName = 'NilaiKoko';
       } else if (tipe === 'Ekstra') {
         const e = document.getElementById('input-ekskul').value; if(!e) return showToast("Nama Ekskul wajib diisi!", true);
