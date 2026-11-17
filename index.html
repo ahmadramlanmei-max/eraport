@@ -557,10 +557,13 @@
             successHandler = (res) => console.log('Respons Worker:', res);
             failureHandler = (err) => console.error('Kesalahan Worker:', err);
 
+            const controller = new AbortController();
+            const requestTimer = setTimeout(() => controller.abort(), 90000);
             fetch(WORKER_API_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: property, args, token: localStorage.getItem('eraport_session_token') || '' })
+              body: JSON.stringify({ action: property, args, token: localStorage.getItem('eraport_session_token') || '' }),
+              signal: controller.signal
             })
             .then(async response => {
               const raw = await response.text();
@@ -570,8 +573,8 @@
               if (!response.ok) throw new Error(result.message || `HTTP ${response.status}`);
               return result;
             })
-            .then(result => onSuccess(result))
-            .catch(error => onFailure(error));
+            .then(result => { clearTimeout(requestTimer); onSuccess(result); })
+            .catch(error => { clearTimeout(requestTimer); onFailure(error && error.name === 'AbortError' ? new Error('Permintaan ke server melebihi 90 detik. Periksa log Worker dan Apps Script; jangan ulangi penyimpanan sebelum memastikan data belum masuk.') : error); });
           };
         }
       });
