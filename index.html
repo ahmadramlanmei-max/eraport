@@ -2282,7 +2282,7 @@
               </select>
             </div>
             <div class="flex-1 min-w-[200px]"><label class="font-bold text-slate-700 block mb-1.5">Kelompok Projek:</label><select id="input-kelompok-p5" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white" onchange="terapkanFilterKelompokP5()"><option value="">-- Pilih Kelompok --</option></select></div>
-            <div class="flex-1 min-w-[200px]"><label class="font-bold text-slate-700 block mb-1.5">Dimensi P5 (seluruh dimensi kelompok):</label><input type="text" id="input-dimensi" readonly class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 font-medium" placeholder="Terisi otomatis dari kelompok"></div>
+            <div class="flex-1 min-w-[200px]"><label class="font-bold text-slate-700 block mb-1.5">Dimensi P5:</label><select id="input-dimensi" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white font-medium" onchange="terapkanFilterKelompokP5()"><option value="">Pilih kelompok terlebih dahulu</option></select></div>
             <div class="flex-1 min-w-[220px]"><label class="font-bold text-slate-700 block mb-1.5">Tema Projek:</label><input type="text" id="input-tema" readonly class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 font-medium" placeholder="Terisi dari pemetaan Admin"></div>
           </div>
           <div class="overflow-x-auto">
@@ -2377,31 +2377,32 @@
       const g=groupRows[0];
       const d=document.getElementById('input-dimensi'),t=document.getElementById('input-tema');
       const dimensi=[...new Set(groupRows.flatMap(x=>String(x.Dimensi_P5||'').split(';').map(v=>v.trim()).filter(Boolean)))];
-      const dimensiGabung=dimensi.join('; ');
-      if(d)d.value=dimensiGabung;
+      const dimLama=d?.value||'';
+      if(d){
+        d.innerHTML='<option value="">-- Pilih Dimensi --</option>'+dimensi.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+        d.value=dimensi.includes(dimLama)?dimLama:(dimensi[0]||'');
+      }
+      const dimTerpilih=d?.value||'';
       if(t)t.value=g?g.Tema_Projek:'';
-      const members=new Set(groupRows.map(x=>normalisasiNISNFront(x.NISN)));
+      const members=new Set(groupRows.filter(x=>String(x.Dimensi_P5||'').trim()===dimTerpilih).map(x=>normalisasiNISNFront(x.NISN)));
       document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr=>{
         const nisn=normalisasiNISNFront(tr.getAttribute('data-nisn'));
-        const visible=!!id&&dimensi.length>0&&members.has(nisn);
+        const visible=!!id&&!!dimTerpilih&&members.has(nisn);
         tr.style.display=visible?'':'none';
-        const kandidat=(state.db.nilaiKoko||[]).filter(x=>
+        const saved=(state.db.nilaiKoko||[]).find(x=>
           normalisasiNISNFront(x.NISN)===nisn &&
           (String(x.Tahun_Ajaran||'')===String(state.filter.ta||'') || !String(x.Tahun_Ajaran||'').trim()) &&
           (String(x.Semester||'')===String(state.filter.sm||'') || !String(x.Semester||'').trim()) &&
+          String(x.Dimensi_P5||'').trim()===String(dimTerpilih).trim() &&
           String(x.Tema_Projek||'').trim()===String(g?.Tema_Projek||'').trim()
         );
-        const saved=kandidat.find(x=>String(x.Dimensi_P5||'').split(';').map(v=>v.trim()).sort().join('|')===dimensi.slice().sort().join('|'));
-        const savedLegacy=kandidat.filter(x=>dimensi.includes(String(x.Dimensi_P5||'').trim()));
-        const capaian=tr.querySelector('.val-capaian'),deskripsi=tr.querySelector('.val-desc'),status=tr.querySelector('.status-nilai-terisi');
+        const capaian=tr.querySelector('.val-capaian');
+        const deskripsi=tr.querySelector('.val-desc');
+        const status=tr.querySelector('.status-nilai-terisi');
         if(saved){
           if(capaian)capaian.value=String(saved.Capaian||'Mahir');
           if(deskripsi)deskripsi.value=saved.Deskripsi||'';
           if(status){status.textContent='✓ Nilai sudah tersimpan — perubahan akan memperbarui nilai ini';status.className='status-nilai-terisi text-xs font-semibold mt-1 text-emerald-700';}
-        }else if(savedLegacy.length){
-          if(capaian)capaian.value=String(savedLegacy[0].Capaian||'Mahir');
-          if(deskripsi)deskripsi.value=[...new Set(savedLegacy.map(x=>String(x.Deskripsi||'').trim()).filter(Boolean))].join(' ');
-          if(status){status.textContent='✓ Nilai lama ditemukan — simpan kembali untuk menggabungkan seluruh dimensi';status.className='status-nilai-terisi text-xs font-semibold mt-1 text-emerald-700';}
         }else{
           if(capaian)capaian.value='Mahir';
           if(deskripsi)deskripsi.value='';
@@ -2565,7 +2566,7 @@
           }
         }); keys = ['NISN', 'Mata_Pelajaran', 'Tahun_Ajaran', 'Semester']; sheetName = 'NilaiIntra';
       } else if (tipe === 'Koko') {
-        const d = document.getElementById('input-dimensi').value, t = document.getElementById('input-tema').value; if(!d||!t) return showToast("Pilih kelompok projek yang memiliki dimensi dan tema!", true);
+        const d = document.getElementById('input-dimensi').value, t = document.getElementById('input-tema').value; if(!d||!t) return showToast("Dimensi & Tema wajib diisi!", true);
         document.querySelectorAll('#tbl-nilai-koko tr[data-nisn]').forEach(tr => { if(tr.style.display !== 'none') payload.push({ NISN: tr.getAttribute('data-nisn'), Dimensi_P5: d, Tema_Projek: t, Tahun_Ajaran: state.filter.ta, Semester: state.filter.sm, Capaian: tr.querySelector('.val-capaian').value, Deskripsi: tr.querySelector('.val-desc').value }); });
         keys = ['NISN', 'Dimensi_P5', 'Tema_Projek', 'Tahun_Ajaran', 'Semester']; sheetName = 'NilaiKoko';
       } else if (tipe === 'Ekstra') {
@@ -3735,7 +3736,7 @@ function renderCatatan(container) {
 
           <div style="display: flex; justify-content: space-between; gap: 10px; page-break-inside: avoid; margin-bottom: 20px;">
             <div style="flex: 1; min-width: 0;">
-              <h3 style="font-size: 11pt; font-weight: bold; margin: 0 0 8px 0;">D. KETIDAKHADIRAN</h3>
+              <h3 style="font-size: 11pt; font-weight: bold; margin: 15px 0 8px 0;">D. KETIDAKHADIRAN</h3>
               <table style="width: 100%; border-collapse: collapse; font-size: 11pt;">
                 <tr><td style="border: 1px solid black; padding: 8px; width: 60%;">Sakit</td><td style="border: 1px solid black; padding: 8px; width: 40%; text-align:center;">${sakit} hari</td></tr>
                 <tr><td style="border: 1px solid black; padding: 8px;">Izin</td><td style="border: 1px solid black; padding: 8px; text-align:center;">${izin} hari</td></tr>
@@ -3743,7 +3744,7 @@ function renderCatatan(container) {
               </table>
             </div>
             <div style="flex: 1; min-width: 0;">
-              <h3 style="font-size: 11pt; font-weight: bold; margin: 0 0 8px 0;">E. CATATAN WALI KELAS</h3>
+              <h3 style="font-size: 11pt; font-weight: bold; margin: 15px 0 8px 0;">E. CATATAN WALI KELAS</h3>
               <div style="border: 1px solid black; padding: 10px; min-height: 95px; box-sizing: border-box; text-align:justify; font-style:italic;">
                 ${catatan.Catatan ? `"${catatan.Catatan}"` : 'Belum ada catatan'}
               </div>
