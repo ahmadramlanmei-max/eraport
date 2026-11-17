@@ -1210,7 +1210,7 @@
           const rows = rowsData.map((r, i) => `
             <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
               <td class="py-3 px-4 text-center font-bold text-slate-500">${i + 1}</td>
-              <td class="py-3 px-4 font-bold text-slate-800">${r.urutanMapel && r.urutanMapel < 999 ? r.urutanMapel + '. ' : ''}${escapeHtml(r.mapel || '-')}</td>
+              <td class="py-3 px-4 font-bold text-slate-800">${escapeHtml(r.mapel || '-')}</td>
               <td class="py-3 px-4 font-semibold text-slate-800">${escapeHtml(r.nama || '-')}</td>
               <td class="py-3 px-4 text-slate-600 font-medium">${escapeHtml(r.username || '-')}</td>
               <td class="py-3 px-4 text-slate-600">${escapeHtml(r.kelas || '-')}</td>
