@@ -1002,8 +1002,39 @@
       const opsiDimensi = '<option value="">-- Pilih Dimensi --</option>' + (state.db.dimensiP5||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()!=='nonaktif').map(x=>`<option value="${escapeHtml(x.Dimensi)}">${escapeHtml(x.Dimensi)}</option>`).join('');
       const opsiTema = '<option value="">-- Pilih Tema --</option>' + (state.db.temaProjek||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()!=='nonaktif').map(x=>`<option value="${escapeHtml(x.Tema_Projek)}">${escapeHtml(x.Tema_Projek)}</option>`).join('');
       const opsiEkstra = (state.db.masterEkstra||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()!=='nonaktif').map(x=>`<option value="${escapeHtml(x.Nama_Ekskul)}">${escapeHtml(x.Nama_Ekskul)}</option>`).join('');
-      const mapel = (state.db.masterMapel||[]).filter(x=>String(x.Status||'Aktif').toLowerCase()==='aktif').sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999)).map(x=>String(x.Nama_Mapel||'').trim()).filter(Boolean);
-      const tblIntra=(state.db.pemetaanIntra||[]).filter(x=>x.Tahun_Ajaran===ta&&x.Semester===sm).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml((kelas.find(k=>k.ID_Kelas===x.ID_Kelas)||{}).Nama_Kelas||x.ID_Kelas)}</td><td class="p-2">${escapeHtml(x.Mata_Pelajaran)}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editPemetaanIntra('${escapeHtml(ta)}','${escapeHtml(sm)}','${escapeHtml(x.ID_Kelas)}','${escapeHtml(x.Mata_Pelajaran)}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="hapusPemetaanIntra('${escapeHtml(ta)}','${escapeHtml(sm)}','${escapeHtml(x.ID_Kelas)}','${escapeHtml(x.Mata_Pelajaran)}')" class="text-rose-600 font-bold px-2">Hapus</button></td></tr>`).join('');
+      // Urutan master mata pelajaran menjadi acuan tunggal untuk seluruh tampilan mapel.
+      // Gunakan pemeriksaan angka eksplisit agar Urutan = 0 tidak dianggap kosong.
+      const masterMapelAktif = (state.db.masterMapel || [])
+        .filter(x => String(x.Status || 'Aktif').toLowerCase() === 'aktif')
+        .slice()
+        .sort((a, b) => {
+          const ua = Number(a.Urutan);
+          const ub = Number(b.Urutan);
+          const na = Number.isFinite(ua) && String(a.Urutan).trim() !== '' ? ua : 999999;
+          const nb = Number.isFinite(ub) && String(b.Urutan).trim() !== '' ? ub : 999999;
+          return na - nb;
+        });
+
+      const mapel = masterMapelAktif
+        .map(x => String(x.Nama_Mapel || '').trim())
+        .filter(Boolean);
+
+      const urutanMapelPemetaan = nama => {
+        const index = mapel.findIndex(m => mapelSama(m, nama));
+        return index < 0 ? 999999 : index;
+      };
+
+      // Data pemetaan yang tersimpan di backend dapat datang dalam urutan berbeda.
+      // Urutkan ulang berdasarkan Master Mata Pelajaran sebelum ditampilkan.
+      const dataPemetaanIntra = (state.db.pemetaanIntra || [])
+        .filter(x => String(x.Tahun_Ajaran || '') === ta && String(x.Semester || '') === sm)
+        .map((x, index) => ({ ...x, _urutanAsli: index }))
+        .sort((a, b) =>
+          urutanMapelPemetaan(a.Mata_Pelajaran) - urutanMapelPemetaan(b.Mata_Pelajaran) ||
+          a._urutanAsli - b._urutanAsli
+        );
+
+      const tblIntra = dataPemetaanIntra.map((x, i) => `<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml((kelas.find(k=>String(k.ID_Kelas)===String(x.ID_Kelas))||{}).Nama_Kelas||x.ID_Kelas)}</td><td class="p-2">${escapeHtml(x.Mata_Pelajaran)}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editPemetaanIntra('${escapeHtml(ta)}','${escapeHtml(sm)}','${escapeHtml(x.ID_Kelas)}','${escapeHtml(x.Mata_Pelajaran)}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="hapusPemetaanIntra('${escapeHtml(ta)}','${escapeHtml(sm)}','${escapeHtml(x.ID_Kelas)}','${escapeHtml(x.Mata_Pelajaran)}')" class="text-rose-600 font-bold px-2">Hapus</button></td></tr>`).join('');
       const tblDim=(state.db.dimensiP5||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Dimensi)}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editPemetaanMaster('dimensi','${escapeHtml(x.Dimensi)}','ID_Dimensi','${escapeHtml(x.ID_Dimensi||'')}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="hapusPemetaanMaster('dimensi','${escapeHtml(x.Dimensi)}','ID_Dimensi','${escapeHtml(x.ID_Dimensi||'')}')" class="text-rose-600 font-bold px-2">Hapus</button></td></tr>`).join('');
       const tblTema=(state.db.temaProjek||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Tema_Projek)}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editPemetaanMaster('tema','${escapeHtml(x.Tema_Projek)}','ID_Tema','${escapeHtml(x.ID_Tema||'')}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="hapusPemetaanMaster('tema','${escapeHtml(x.Tema_Projek)}','ID_Tema','${escapeHtml(x.ID_Tema||'')}')" class="text-rose-600 font-bold px-2">Hapus</button></td></tr>`).join('');
       const tblEkstra=(state.db.masterEkstra||[]).map((x,i)=>`<tr class="border-b"><td class="p-2">${i+1}</td><td class="p-2">${escapeHtml(x.Nama_Ekskul)}</td><td class="p-2 text-right whitespace-nowrap"><button onclick="editPemetaanMaster('ekstraMaster','${escapeHtml(x.Nama_Ekskul)}','ID_Ekstra','${escapeHtml(x.ID_Ekstra||'')}')" class="text-blue-600 font-bold px-2">Edit</button><button onclick="hapusPemetaanMaster('ekstraMaster','${escapeHtml(x.Nama_Ekskul)}','ID_Ekstra','${escapeHtml(x.ID_Ekstra||'')}')" class="text-rose-600 font-bold px-2">Hapus</button></td></tr>`).join('');
