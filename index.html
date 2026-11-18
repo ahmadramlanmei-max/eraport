@@ -886,7 +886,7 @@
         return;
       }
       document.getElementById('offline-badge').classList.add('hidden');
-      showLoading(true, "Membangun Data Spreadsheet...");
+      showLoading(true, "Memuat Database...");
       
       google.script.run.withSuccessHandler(res => {
         showLoading(false);
