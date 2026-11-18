@@ -3648,7 +3648,42 @@ function renderCatatan(container) {
       }).filter(Boolean).concat(
         nIntraRaw.filter(n => !urutanMapel.some(m => mapelSama(m, n.Mata_Pelajaran)))
       ).sort((a, b) => indexMapel(a.Mata_Pelajaran) - indexMapel(b.Mata_Pelajaran));
-      const nKoko = (state.db.nilaiKoko || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester));
+      // Data Kokurikuler pada sumber tersimpan satu baris untuk setiap dimensi.
+      // Untuk PDF, gabungkan baris yang memiliki tema projek sama agar satu tema
+      // hanya tampil satu kali dengan seluruh dimensinya dalam satu sel.
+      const nKokoRaw = (state.db.nilaiKoko || []).filter(x =>
+        x.NISN == nisn &&
+        (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) &&
+        (x.Semester == state.filter.sm || !x.Semester)
+      );
+
+      const kelompokKoko = new Map();
+
+      nKokoRaw.forEach(x => {
+        const tema = String(x.Tema_Projek || '').trim() || 'Tanpa Tema';
+
+        if (!kelompokKoko.has(tema)) {
+          kelompokKoko.set(tema, {
+            Tema_Projek: tema,
+            Dimensi: [],
+            Capaian: x.Capaian || '',
+            Deskripsi: x.Deskripsi || ''
+          });
+        }
+
+        const item = kelompokKoko.get(tema);
+        const dimensi = String(x.Dimensi_P5 || '').trim();
+
+        if (dimensi && !item.Dimensi.includes(dimensi)) {
+          item.Dimensi.push(dimensi);
+        }
+
+        // Gunakan satu capaian dan satu deskripsi untuk setiap tema.
+        if (!item.Capaian && x.Capaian) item.Capaian = x.Capaian;
+        if (!item.Deskripsi && x.Deskripsi) item.Deskripsi = x.Deskripsi;
+      });
+
+      const nKoko = Array.from(kelompokKoko.values());
       const nEkstra = (state.db.nilaiEkstra || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester));
       // Utamakan catatan pada semester aktif. Jika belum ada keputusan di semester aktif,
       // cari keputusan Lulus pada tahun ajaran yang sama agar tetap terbaca saat mencetak rapor.
@@ -3797,10 +3832,14 @@ function renderCatatan(container) {
               </thead>
               <tbody>
                 ${nKoko.length > 0 ? nKoko.map((n, i) => `<tr>
-                  <td style="text-align:center; vertical-align:top;">${i+1}</td>
-                  <td style="vertical-align:top;"><b>${n.Dimensi_P5}</b><br><span style="font-size:10pt;">Tema: ${n.Tema_Projek}</span></td>
-                  <td style="text-align:center; font-weight:bold; vertical-align:top;">${n.Capaian}</td>
-                  <td style="text-align:justify; vertical-align:top;">${n.Deskripsi || '-'}</td>
+                  <td style="text-align:center; vertical-align:top;">${i + 1}</td>
+                  <td style="vertical-align:top;">
+                    <b>${n.Dimensi.map(d => escapeHtml(d)).join('<br>')}</b>
+                    <br>
+                    <span style="font-size:10pt;">Tema: ${escapeHtml(n.Tema_Projek)}</span>
+                  </td>
+                  <td style="text-align:center; font-weight:bold; vertical-align:top;">${escapeHtml(n.Capaian || '-')}</td>
+                  <td style="text-align:justify; vertical-align:top;">${escapeHtml(n.Deskripsi || '-')}</td>
                 </tr>`).join('') : '<tr><td colspan="4" style="border: 1px solid black; padding: 8px; text-align:center;">Belum ada data projek P5</td></tr>'}
               </tbody>
             </table>
