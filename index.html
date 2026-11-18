@@ -3634,13 +3634,28 @@ function renderCatatan(container) {
       setTimeout(() => { window.print(); setTimeout(() => { pa.classList.add('hidden'); pa.innerHTML = ''; }, 3000); }, 500);
     }
 
-    async function cetakRaport(nisn) {
-      try { await refreshPrintDataFromFirestore({ nisn: String(nisn) }); }
-      catch (error) { showToast('Data cetak gagal dimuat dari Firestore: ' + (error.message || error), true); return; }
-      const s = state.db.siswa.find(x => x.NISN == nisn), kls = state.db.kelas.find(x => x.ID_Kelas == s.ID_Kelas) || {}, p = state.db.pengaturan || {};
+    async function cetakRaport(nisn, dataHistoris = null) {
+      if (!dataHistoris) {
+        try { await refreshPrintDataFromFirestore({ nisn: String(nisn) }); }
+        catch (error) { showToast('Data cetak gagal dimuat dari Firestore: ' + (error.message || error), true); return; }
+      }
+      const printDb = dataHistoris ? {
+        ...state.db,
+        siswa: [dataHistoris.siswa],
+        kelas: [dataHistoris.kelas],
+        nilaiIntra: dataHistoris.nilaiIntra || [],
+        nilaiKoko: dataHistoris.nilaiKoko || [],
+        nilaiEkstra: dataHistoris.nilaiEkstra || [],
+        kehadiran: dataHistoris.kehadiran || [],
+        catatanWali: dataHistoris.catatanWali || []
+      } : state.db;
+      const printFilter = dataHistoris ? {ta:dataHistoris.ta, sm:dataHistoris.sm} : state.filter;
+      const s = printDb.siswa.find(x => normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn));
+      if (!s) return showToast('Data identitas siswa untuk cetak tidak ditemukan.', true);
+      const kls = printDb.kelas.find(x => String(x.ID_Kelas) === String(s.ID_Kelas)) || {}, p = printDb.pengaturan || {};
       
       let wkUsername = kls.Wali_Kelas_Username || '';
-      let userData = (state.db.users || []).find(u => u.Username === wkUsername);
+      let userData = (printDb.users || []).find(u => u.Username === wkUsername);
       let namaWaliLengkap = userData && userData.Nama_Lengkap ? userData.Nama_Lengkap : (wkUsername || '-');
       let nipWali = userData && userData.NIP && userData.NIP !== '-' ? `NIP. ${userData.NIP}` : '';
       
@@ -3650,20 +3665,20 @@ function renderCatatan(container) {
       let rawTgl = String(p.Tanggal_Raport || p['Tanggal Raport'] || p.Tanggal_Rapor || '');
       const tglRaport = (rawTgl.trim() !== '' && rawTgl !== 'undefined') ? rawTgl : '.......................';
       
-      let isGenapValue = String(state.filter.sm || p.Semester || '').trim().toLowerCase();
+      let isGenapValue = String(printFilter.sm || p.Semester || '').trim().toLowerCase();
       const isGenap = (isGenapValue === 'genap');
 
       // Ambil nilai hanya untuk siswa yang sedang dicetak dan kelasnya.
       // Jika data nilai lama tidak memiliki ID_Kelas, tetap gunakan NISN agar kompatibel.
-      const nIntraRaw = (state.db.nilaiIntra || []).filter(x =>
+      const nIntraRaw = (printDb.nilaiIntra || []).filter(x =>
         String(x.NISN).trim() === String(nisn).trim() &&
-        (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) &&
-        (x.Semester == state.filter.sm || !x.Semester) &&
+        (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) &&
+        (x.Semester == printFilter.sm || !x.Semester) &&
         (!x.ID_Kelas || String(x.ID_Kelas).trim() === String(s.ID_Kelas).trim())
       );
 
       // Urutan rapor mengikuti urutan Daftar Mata Pelajaran pada Input Nilai.
-      const urutanMapel = (state.db.masterMapel||[])
+      const urutanMapel = (printDb.masterMapel||[])
         .filter(x=>String(x.Status||'Aktif').toLowerCase()==='aktif')
         .sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999))
         .map(x=>String(x.Nama_Mapel||'').trim()).filter(Boolean);
@@ -3682,10 +3697,10 @@ function renderCatatan(container) {
       // Data Kokurikuler pada sumber tersimpan satu baris untuk setiap dimensi.
       // Untuk PDF, gabungkan baris yang memiliki tema projek sama agar satu tema
       // hanya tampil satu kali dengan seluruh dimensinya dalam satu sel.
-      const nKokoRaw = (state.db.nilaiKoko || []).filter(x =>
+      const nKokoRaw = (printDb.nilaiKoko || []).filter(x =>
         x.NISN == nisn &&
-        (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) &&
-        (x.Semester == state.filter.sm || !x.Semester)
+        (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) &&
+        (x.Semester == printFilter.sm || !x.Semester)
       );
 
       const kelompokKoko = new Map();
@@ -3715,7 +3730,7 @@ function renderCatatan(container) {
       });
 
       const nKoko = Array.from(kelompokKoko.values());
-      const nEkstra = (state.db.nilaiEkstra || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester));
+      const nEkstra = (printDb.nilaiEkstra || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) && (x.Semester == printFilter.sm || !x.Semester));
       // Utamakan catatan pada semester aktif. Jika belum ada keputusan di semester aktif,
       // cari keputusan Lulus pada tahun ajaran yang sama agar tetap terbaca saat mencetak rapor.
       const normalisasiKunciCatatan = value =>
@@ -3733,15 +3748,15 @@ function renderCatatan(container) {
 
       // Ambil semua catatan milik siswa pada tahun ajaran yang sedang dicetak.
       // Pencocokan dinormalisasi agar spasi/format header lama tidak menggagalkan pembacaan.
-      const catatanWaliSiswa = (state.db.catatanWali || []).filter(x =>
+      const catatanWaliSiswa = (printDb.catatanWali || []).filter(x =>
         normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) &&
         (
-          normalisasiKunciCatatan(x.Tahun_Ajaran) === normalisasiKunciCatatan(state.filter.ta) ||
+          normalisasiKunciCatatan(x.Tahun_Ajaran) === normalisasiKunciCatatan(printFilter.ta) ||
           !normalisasiKunciCatatan(x.Tahun_Ajaran)
         )
       );
 
-      const semesterAktifNorm = normalisasiKunciCatatan(state.filter.sm);
+      const semesterAktifNorm = normalisasiKunciCatatan(printFilter.sm);
       const catatanSemester = catatanWaliSiswa.filter(x =>
         normalisasiKunciCatatan(x.Semester) === semesterAktifNorm
       );
@@ -3772,7 +3787,7 @@ function renderCatatan(container) {
           (keputusanLain && keputusanLain.Catatan) || '',
         Kenaikan_Kelas: keputusanFinal
       };
-      const kHadir = (state.db.kehadiran || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == state.filter.ta || !x.Tahun_Ajaran) && (x.Semester == state.filter.sm || !x.Semester));
+      const kHadir = (printDb.kehadiran || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) && (x.Semester == printFilter.sm || !x.Semester));
       
       let sakit=0, izin=0, alpa=0;
       kHadir.forEach(k => {
@@ -3797,6 +3812,7 @@ function renderCatatan(container) {
             <tr><td style="border:0; padding:0; vertical-align:top;">
         <div class="raport-running-header">
           <h1>LAPORAN HASIL BELAJAR (RAPOR)</h1>
+          ${dataHistoris ? '<div style="text-align:center;font-size:9pt;font-weight:bold;margin:3px 0 7px;">SALINAN / CETAK ULANG</div>' : ''}
           <table>
             <tr>
               <td style="width:20%;">Nama Peserta Didik</td><td style="width:2%;">:</td><td style="width:43%;"><b>${s.Nama_Lengkap.toUpperCase()}</b></td>
@@ -3808,11 +3824,11 @@ function renderCatatan(container) {
             </tr>
             <tr>
               <td>Nama Sekolah</td><td>:</td><td>${p.Nama_Sekolah||'-'}</td>
-              <td>Semester</td><td>:</td><td>${state.filter.sm||'-'}</td>
+              <td>Semester</td><td>:</td><td>${printFilter.sm||'-'}</td>
             </tr>
             <tr>
               <td>Alamat Sekolah</td><td>:</td><td>${p.Alamat_Sekolah||'-'}</td>
-              <td>Tahun Ajaran</td><td>:</td><td>${state.filter.ta||'-'}</td>
+              <td>Tahun Ajaran</td><td>:</td><td>${printFilter.ta||'-'}</td>
             </tr>
           </table>
         </div>
@@ -4047,6 +4063,7 @@ function renderCatatan(container) {
           return;
         }
         const histori = res.data;
+        window._riwayatCetakTerakhir = {nisn: String(nisn), histori};
         let rows = histori.map((h, i) => `
           <tr class="border-b border-slate-100 hover:bg-white transition-colors">
             <td class="py-3 px-4 text-center font-bold text-slate-500">${i+1}</td>
@@ -4055,11 +4072,28 @@ function renderCatatan(container) {
             <td class="py-3 px-4 text-center font-extrabold text-blue-600">${h.rataRata}</td>
             <td class="py-3 px-4 text-center text-xs font-semibold text-slate-500">${h.countMapel} Mapel</td>
             <td class="py-3 px-4 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${h.sumber === 'Arsip' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${h.sumber}</span></td>
+            <td class="py-3 px-4 text-center"><button type="button" onclick="cetakUlangRiwayat(${i})" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-2 text-xs font-bold whitespace-nowrap"><i class="fas fa-print mr-1"></i>Cetak Ulang Rapor</button></td>
           </tr>`).join('');
-        content.innerHTML = `<div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"><table class="w-full text-sm text-left"><thead class="bg-slate-100 uppercase text-[11px] font-extrabold text-slate-600 border-b border-slate-200"><tr><th class="py-3 px-4 text-center w-12">No</th><th class="py-3 px-4">Tahun Ajaran</th><th class="py-3 px-4 text-center">Semester</th><th class="py-3 px-4 text-center">Rata-rata Nilai</th><th class="py-3 px-4 text-center">Data Dihitung</th><th class="py-3 px-4 text-center">Sumber</th></tr></thead><tbody>${rows}</tbody></table></div><p class="text-xs text-slate-400 text-left mt-4"><i class="fas fa-info-circle mr-1"></i> Rata-rata dihitung dari akumulasi Nilai Akhir yang pernah diinputkan.</p>`;
+        content.innerHTML = `<div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"><table class="w-full text-sm text-left"><thead class="bg-slate-100 uppercase text-[11px] font-extrabold text-slate-600 border-b border-slate-200"><tr><th class="py-3 px-4 text-center w-12">No</th><th class="py-3 px-4">Tahun Ajaran</th><th class="py-3 px-4 text-center">Semester</th><th class="py-3 px-4 text-center">Rata-rata Nilai</th><th class="py-3 px-4 text-center">Data Dihitung</th><th class="py-3 px-4 text-center">Sumber</th><th class="py-3 px-4 text-center">Tindakan</th></tr></thead><tbody>${rows}</tbody></table></div><p class="text-xs text-slate-400 text-left mt-4"><i class="fas fa-info-circle mr-1"></i> Rata-rata dihitung dari akumulasi Nilai Akhir yang pernah diinputkan.</p>`;
       }).withFailureHandler(err => {
         content.innerHTML = `<div class="text-rose-500 font-bold py-8">Gagal menarik data: ${err.message}</div>`;
       }).getRiwayatSiswa(nisn);
+    }
+
+    function cetakUlangRiwayat(index) {
+      const pilihan = window._riwayatCetakTerakhir;
+      const periode = pilihan && pilihan.histori && pilihan.histori[index];
+      if (!periode) return showToast('Periode riwayat tidak ditemukan. Silakan buka ulang riwayat siswa.', true);
+      showLoading(true, 'Menyiapkan salinan rapor dari arsip...');
+      google.script.run.withSuccessHandler(async res => {
+        showLoading(false);
+        if (!res || !res.success || !res.data) return showToast((res && res.message) || 'Gagal mengambil data rapor lama.', true);
+        tutupModalRiwayat();
+        await cetakRaport(pilihan.nisn, res.data);
+      }).withFailureHandler(err => {
+        showLoading(false);
+        showToast('Gagal menghubungi server: ' + (err.message || err), true);
+      }).getDataCetakRaportHistoris(pilihan.nisn, periode.ta, periode.sm);
     }
 
     // Pulihkan sesi secara otomatis setelah halaman dimuat ulang atau browser dibuka kembali.
