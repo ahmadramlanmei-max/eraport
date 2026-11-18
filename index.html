@@ -3968,8 +3968,12 @@ function renderCatatan(container) {
       content.innerHTML = `<div class="loader mx-auto mb-4 border-emerald-200 border-t-emerald-600"></div><p class="text-sm font-bold text-slate-500">Mencari jejak rekam nilai dari database dan arsip...</p>`;
       
       google.script.run.withSuccessHandler(res => {
-        if(!res.success || !res.data || res.data.length === 0) {
-          content.innerHTML = `<div class="text-slate-400 font-medium italic py-8">Belum ada jejak riwayat akademik untuk siswa ini.</div>`;
+        if(!res || !res.success) {
+          content.innerHTML = `<div class="text-rose-500 font-semibold py-8">${(res && res.message) ? res.message : 'Gagal membaca riwayat siswa.'}</div>`;
+          return;
+        }
+        if(!res.data || res.data.length === 0) {
+          content.innerHTML = `<div class="text-slate-400 font-medium italic py-8">Belum ada jejak riwayat akademik untuk siswa ini. Periksa apakah data tahun ajaran lama sudah masuk ke Arsip_NilaiIntra.</div>`;
           return;
         }
         const histori = res.data;
