@@ -3641,6 +3641,11 @@ function renderCatatan(container) {
       }
       const printDb = dataHistoris ? {
         ...state.db,
+        // Semua data yang menentukan isi rapor arsip diprioritaskan dari
+        // Spreadsheet melalui getDataCetakRaportHistoris(), bukan Firebase.
+        pengaturan: dataHistoris.pengaturan || {},
+        users: dataHistoris.users || [],
+        masterMapel: dataHistoris.masterMapel || [],
         siswa: [dataHistoris.siswa],
         kelas: [dataHistoris.kelas],
         nilaiIntra: dataHistoris.nilaiIntra || [],
@@ -3671,7 +3676,7 @@ function renderCatatan(container) {
       // Ambil nilai hanya untuk siswa yang sedang dicetak dan kelasnya.
       // Jika data nilai lama tidak memiliki ID_Kelas, tetap gunakan NISN agar kompatibel.
       const nIntraRaw = (printDb.nilaiIntra || []).filter(x =>
-        String(x.NISN).trim() === String(nisn).trim() &&
+        normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) &&
         (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) &&
         (x.Semester == printFilter.sm || !x.Semester) &&
         (!x.ID_Kelas || String(x.ID_Kelas).trim() === String(s.ID_Kelas).trim())
@@ -3698,7 +3703,7 @@ function renderCatatan(container) {
       // Untuk PDF, gabungkan baris yang memiliki tema projek sama agar satu tema
       // hanya tampil satu kali dengan seluruh dimensinya dalam satu sel.
       const nKokoRaw = (printDb.nilaiKoko || []).filter(x =>
-        x.NISN == nisn &&
+        normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) &&
         (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) &&
         (x.Semester == printFilter.sm || !x.Semester)
       );
@@ -3730,7 +3735,7 @@ function renderCatatan(container) {
       });
 
       const nKoko = Array.from(kelompokKoko.values());
-      const nEkstra = (printDb.nilaiEkstra || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) && (x.Semester == printFilter.sm || !x.Semester));
+      const nEkstra = (printDb.nilaiEkstra || []).filter(x => normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) && (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) && (x.Semester == printFilter.sm || !x.Semester));
       // Utamakan catatan pada semester aktif. Jika belum ada keputusan di semester aktif,
       // cari keputusan Lulus pada tahun ajaran yang sama agar tetap terbaca saat mencetak rapor.
       const normalisasiKunciCatatan = value =>
@@ -3787,7 +3792,7 @@ function renderCatatan(container) {
           (keputusanLain && keputusanLain.Catatan) || '',
         Kenaikan_Kelas: keputusanFinal
       };
-      const kHadir = (printDb.kehadiran || []).filter(x => x.NISN == nisn && (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) && (x.Semester == printFilter.sm || !x.Semester));
+      const kHadir = (printDb.kehadiran || []).filter(x => normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) && (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) && (x.Semester == printFilter.sm || !x.Semester));
       
       let sakit=0, izin=0, alpa=0;
       kHadir.forEach(k => {
