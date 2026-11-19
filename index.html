@@ -425,6 +425,7 @@
         <div id="menu-admin" class="hidden">
           <p class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 mt-8">Administrator</p>
           <button onclick="nav('pengaturan')" class="nav-btn w-full text-left py-2.5 px-3 rounded-lg hover:bg-slate-800 hover:text-white transition-all flex items-center gap-3 font-medium" data-target="pengaturan"><i class="fas fa-cogs w-5 text-center"></i> Pengaturan Sekolah</button>
+          <button onclick="nav('arsip-rapor')" class="nav-btn w-full text-left py-2.5 px-3 rounded-lg hover:bg-slate-800 hover:text-white transition-all flex items-center gap-3 font-medium" data-target="arsip-rapor"><i class="fas fa-calendar-archive w-5 text-center text-amber-400"></i> Arsip Tanggal Rapor</button>
           <button onclick="nav('monitor-nilai')" class="nav-btn w-full text-left py-2.5 px-3 rounded-lg hover:bg-slate-800 hover:text-white transition-all flex items-center gap-3 font-medium" data-target="monitor-nilai"><i class="fas fa-clipboard-check w-5 text-center text-emerald-400"></i> Monitoring Nilai Guru</button>
           <button onclick="nav('pemetaan')" class="nav-btn w-full text-left py-2.5 px-3 rounded-lg hover:bg-slate-800 hover:text-white transition-all flex items-center gap-3 font-medium" data-target="pemetaan"><i class="fas fa-diagram-project w-5 text-center text-amber-400"></i> Pemetaan Akademik</button>
         </div>
@@ -973,6 +974,7 @@
         case 'nilai': title.innerText = "Input Nilai Kumer"; renderNilai(content); break;
         case 'catatan': title.innerText = "Catatan Wali Kelas"; renderCatatan(content); break;
         case 'pengaturan': title.innerText = "Pengaturan Sekolah"; renderPengaturan(content); break;
+        case 'arsip-rapor': title.innerText = "Arsip Tempat & Tanggal Rapor"; renderArsipPengaturanRaport(content); break;
         case 'monitor-nilai': title.innerText = "Monitoring Nilai Guru"; renderMonitoringNilai(content); break;
         case 'pemetaan': title.innerText = "Pemetaan Akademik"; renderPemetaanAkademik(content); break;
         case 'cetak': title.innerText = "Cetak Dokumen Resmi"; renderCetak(content); break;
@@ -3114,6 +3116,68 @@ function renderCatatan(container) {
         </div>
       `;
     }
+    function renderArsipPengaturanRaport(container) {
+      if (String(state.user && state.user.role || '').trim().toLowerCase() !== 'admin') {
+        container.innerHTML = '<div class="p-6 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl font-bold">Akses ditolak. Halaman khusus Administrator.</div>';
+        return;
+      }
+      const tahunAktif = String(state.db.pengaturan && state.db.pengaturan.Tahun_Ajaran || state.filter.ta || '');
+      const tahunDasar = parseInt(tahunAktif.split('/')[0],10) || new Date().getFullYear();
+      const opsiTahun = Array.from({length:12},(_,i)=>tahunDasar-8+i).map(y=>{
+        const ta = `${y}/${y+1}`;
+        return `<option value="${ta}" ${ta===tahunAktif?'selected':''}>${ta}</option>`;
+      }).join('');
+      container.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8 max-w-4xl mx-auto fade-in">
+          <div class="flex items-center gap-3 mb-5 border-b border-slate-100 pb-4">
+            <div class="bg-amber-100 p-3 rounded-xl text-amber-600"><i class="fas fa-calendar-archive text-xl"></i></div>
+            <div><h2 class="text-xl font-extrabold text-slate-800">Arsip Tempat & Tanggal Cetak Rapor</h2><p class="text-sm text-slate-500">Isi satu kali untuk setiap tahun ajaran dan semester yang sudah berlalu.</p></div>
+          </div>
+          <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm mb-6">
+            <b>Catatan:</b> Data di sini khusus untuk cetak ulang rapor historis. Pengaturan tanggal rapor periode berjalan tidak akan berubah.
+          </div>
+          <form onsubmit="simpanArsipPengaturanRaportUI(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div><label class="block text-sm font-bold text-slate-700 mb-1.5">Tahun Ajaran</label><select id="arsip-rapor-ta" required class="w-full border border-slate-300 rounded-xl px-4 py-3 bg-white">${opsiTahun}</select></div>
+            <div><label class="block text-sm font-bold text-slate-700 mb-1.5">Semester</label><select id="arsip-rapor-sm" required class="w-full border border-slate-300 rounded-xl px-4 py-3 bg-white"><option value="Ganjil">Ganjil</option><option value="Genap">Genap</option></select></div>
+            <div class="md:col-span-2"><label class="block text-sm font-bold text-slate-700 mb-1.5">Tempat dan Tanggal Cetak Rapor</label><input id="arsip-rapor-tt" type="text" required placeholder="Contoh: Bukit Raya, 20 Desember 2024" class="w-full border border-slate-300 rounded-xl px-4 py-3"></div>
+            <div class="md:col-span-2 flex justify-end"><button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl"><i class="fas fa-save mr-2"></i>Simpan Arsip Periode</button></div>
+          </form>
+          <div class="mt-8 border-t border-slate-100 pt-6">
+            <h3 class="font-extrabold text-slate-800 mb-3">Daftar Arsip Tersimpan</h3>
+            <div id="arsip-rapor-list" class="overflow-x-auto"><p class="text-sm text-slate-500">Memuat arsip...</p></div>
+          </div>
+        </div>`;
+      muatDaftarArsipPengaturanRaport();
+    }
+
+    function muatDaftarArsipPengaturanRaport() {
+      const target = document.getElementById('arsip-rapor-list');
+      if (!target) return;
+      google.script.run.withSuccessHandler(res => {
+        if (!res || !res.success) { target.innerHTML = `<p class="text-rose-600 text-sm">${(res && res.message) || 'Gagal memuat arsip.'}</p>`; return; }
+        const rows = res.data || [];
+        target.innerHTML = rows.length ? `<table class="w-full text-sm"><thead class="bg-slate-100 text-slate-600"><tr><th class="text-left p-3">Tahun Ajaran</th><th class="text-left p-3">Semester</th><th class="text-left p-3">Tempat & Tanggal</th></tr></thead><tbody>${rows.map(x=>`<tr class="border-b border-slate-100"><td class="p-3 font-bold">${escapeHtml(x.Tahun_Ajaran)}</td><td class="p-3">${escapeHtml(x.Semester)}</td><td class="p-3">${escapeHtml(x.Tempat_Tanggal)}</td></tr>`).join('')}</tbody></table>` : '<p class="text-sm text-slate-500 bg-slate-50 p-4 rounded-lg">Belum ada arsip tempat dan tanggal rapor.</p>';
+      }).withFailureHandler(err => { target.innerHTML = `<p class="text-rose-600 text-sm">${escapeHtml(err.message || 'Koneksi gagal.')}</p>`; }).getArsipPengaturanRaport(state.user.username);
+    }
+
+    function simpanArsipPengaturanRaportUI(e) {
+      e.preventDefault();
+      const payload = {
+        Tahun_Ajaran: document.getElementById('arsip-rapor-ta').value,
+        Semester: document.getElementById('arsip-rapor-sm').value,
+        Tempat_Tanggal: document.getElementById('arsip-rapor-tt').value.trim()
+      };
+      showLoading(true, 'Menyimpan arsip tanggal rapor...');
+      google.script.run.withSuccessHandler(res => {
+        showLoading(false);
+        showToast(res.message || (res.success ? 'Arsip tersimpan.' : 'Gagal menyimpan.'), !res.success);
+        if (res.success) {
+          document.getElementById('arsip-rapor-tt').value = '';
+          muatDaftarArsipPengaturanRaport();
+        }
+      }).withFailureHandler(err => { showLoading(false); showToast('Gagal menyimpan arsip: ' + (err.message || err), true); }).simpanArsipPengaturanRaport(payload, state.user.username);
+    }
+
     function submitPengaturan(e) {
       e.preventDefault(); 
       const payload = { Nama_Sekolah: document.getElementById('pg-sekolah').value, Alamat_Sekolah: document.getElementById('pg-alamat').value, Kepala_Sekolah: document.getElementById('pg-kepsek').value, NIP_Kepsek: document.getElementById('pg-nipkepsek').value, Tahun_Ajaran: document.getElementById('pg-tahun').value, Semester: document.getElementById('pg-semester').value, Tanggal_Raport: document.getElementById('pg-tglraport').value, URL_Logo: document.getElementById('pg-logo').value };
