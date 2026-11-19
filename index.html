@@ -591,8 +591,8 @@
       return proxy;
     })();
 
-    // Ambil data cetak langsung dari Firestore melalui Worker setiap kali dokumen dicetak.
-    // Tidak mengubah format HTML/cetak yang sudah ada.
+    // Ambil data cetak reguler dari layanan data cetak.
+    // Fungsi ini hanya dipanggil untuk cetak rapor biasa, bukan cetak ulang historis.
     async function refreshPrintDataFromFirestore(filters = {}) {
       const token = localStorage.getItem('eraport_session_token') || '';
       if (!token) throw new Error('Sesi login tidak ditemukan. Silakan login kembali.');
@@ -3387,7 +3387,7 @@ function renderCatatan(container) {
 
     async function cetakLegerSiswa(nisn) {
       try { await refreshPrintDataFromFirestore({ nisn: String(nisn) }); }
-      catch (error) { showToast('Data cetak gagal dimuat dari Firestore: ' + (error.message || error), true); return; }
+      catch (error) { showToast('Data cetak reguler gagal dimuat: ' + (error.message || error), true); return; }
       const s = (state.db.siswa || []).find(x => String(x.NISN) === String(nisn));
       if (!s) return showToast('Data siswa tidak ditemukan.', true);
 
