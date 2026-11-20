@@ -4001,7 +4001,22 @@ function renderCatatan(container) {
             <tbody>
               ${nIntra.length > 0 ? nIntra.map((n, i) => {
                 let desc = '';
-                if(n.Capaian_Tercapai) desc += `<div style="margin-bottom: 6px;">Menunjukkan penguasaan dalam ${n.Capaian_Tercapai}.</div>`;
+                // Predikat capaian kompetensi ditentukan otomatis dari Nilai Akhir siswa.
+                const nilaiAngkaPredikat = Number(String(n.Nilai_Akhir == null ? '' : n.Nilai_Akhir).trim().replace(',', '.').replace(/[^0-9.-]/g, ''));
+                let predikatCapaian = '';
+                if (Number.isFinite(nilaiAngkaPredikat) && String(n.Nilai_Akhir == null ? '' : n.Nilai_Akhir).trim() !== '') {
+                  if (nilaiAngkaPredikat >= 90 && nilaiAngkaPredikat <= 100) predikatCapaian = 'Sangat Baik';
+                  else if (nilaiAngkaPredikat >= 79 && nilaiAngkaPredikat < 90) predikatCapaian = 'Baik';
+                  else if (nilaiAngkaPredikat >= 60 && nilaiAngkaPredikat < 79) predikatCapaian = 'Cukup';
+                  else if (nilaiAngkaPredikat >= 0 && nilaiAngkaPredikat < 60) predikatCapaian = 'Kurang';
+                }
+                if(n.Capaian_Tercapai) {
+                  const awalanCapaian = predikatCapaian
+                    ? `Menunjukkan penguasaan yang ${predikatCapaian} dalam`
+                    : 'Menunjukkan penguasaan dalam';
+                  desc += `<div style="margin-bottom: 6px;">${awalanCapaian} ${n.Capaian_Tercapai}.</div>`;
+                }
+                // Deskripsi Perlu Bimbingan sengaja dipertahankan sesuai pengaturan sebelumnya.
                 if(n.Capaian_Perlu_Peningkatan) desc += `<div>Perlu bimbingan dalam ${n.Capaian_Perlu_Peningkatan}.</div>`;
                 return `<tr>
                   <td style="text-align:center; vertical-align:top;">${i+1}</td>
