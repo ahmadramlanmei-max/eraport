@@ -1757,6 +1757,65 @@
       inpAngka.value = nilaiRapor !== '-' ? nilaiRapor : '';
     }
 
+    let modeTPPenerapan = 'semua';
+    function hitungSisaTP(n) {
+      const el=document.getElementById(`master-tp-${n}`), sisa=document.getElementById(`sisa-tp-${n}`);
+      if(el&&sisa) sisa.innerText=100-el.value.length;
+    }
+    function daftarTPMaster() {
+      return Array.from({length:10},(_,i)=>({index:i+1,teks:String(document.getElementById(`master-tp-${i+1}`)?.value||'').trim()})).filter(x=>x.teks);
+    }
+    function escapeTP(teks) {
+      return String(teks).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+    function renderPilihanTPBaris(tr,ya=[],tidak=[]) {
+      const daftar=daftarTPMaster();
+      const buat=(tp,status,pilih)=>`<label class="flex items-start gap-1.5 p-1"><input type="checkbox" class="tp-checkbox mt-0.5" data-status="${status}" data-tp-index="${tp.index}" ${pilih?'checked':''} onchange="ubahPilihanTP(this)"><span>TP ${tp.index}: ${escapeTP(tp.teks)}</span></label>`;
+      tr.querySelector('.tp-pilihan-tercapai').innerHTML=daftar.map(tp=>buat(tp,'tercapai',ya.includes(tp.index))).join('')||'<span class="text-slate-400">Isi daftar TP di atas</span>';
+      tr.querySelector('.tp-pilihan-tidak').innerHTML=daftar.map(tp=>buat(tp,'tidak',tidak.includes(tp.index))).join('')||'<span class="text-slate-400">Isi daftar TP di atas</span>';
+      tr.dataset.tpTercapai=JSON.stringify(ya); tr.dataset.tpTidak=JSON.stringify(tidak); perbaruiDeskripsiTPBaris(tr);
+    }
+    function perbaruiDeskripsiTPBaris(tr) {
+      const master=daftarTPMaster();
+      const ya=Array.from(tr.querySelectorAll('.tp-checkbox[data-status="tercapai"]:checked')).map(x=>Number(x.dataset.tpIndex));
+      const tidak=Array.from(tr.querySelectorAll('.tp-checkbox[data-status="tidak"]:checked')).map(x=>Number(x.dataset.tpIndex));
+      tr.querySelector('.val-tercapai').value=ya.map(i=>master.find(x=>x.index===i)?.teks).filter(Boolean).join('; ');
+      tr.querySelector('.val-perlu').value=tidak.map(i=>master.find(x=>x.index===i)?.teks).filter(Boolean).join('; ');
+      tr.dataset.tpTercapai=JSON.stringify(ya); tr.dataset.tpTidak=JSON.stringify(tidak);
+    }
+    function ubahPilihanTP(cb) {
+      const tr=cb.closest('tr[data-nisn]'); if(!tr)return;
+      if(tr.querySelectorAll(`.tp-checkbox[data-status="${cb.dataset.status}"]:checked`).length>3){cb.checked=false;showToast('Maksimal 3 TP untuk setiap kategori.',true);return;}
+      const lawan=cb.dataset.status==='tercapai'?'tidak':'tercapai';
+      const duplikat=tr.querySelector(`.tp-checkbox[data-status="${lawan}"][data-tp-index="${cb.dataset.tpIndex}"]`);
+      if(cb.checked&&duplikat?.checked){cb.checked=false;showToast('TP yang sama tidak boleh dipilih pada dua kategori.',true);return;}
+      perbaruiDeskripsiTPBaris(tr);
+    }
+    function renderPilihanTPGlobal() {
+      const daftar=daftarTPMaster();
+      ['tercapai','tidak'].forEach(status=>{
+        const area=document.getElementById(status==='tercapai'?'tp-semua-tercapai':'tp-semua-tidak'); if(!area)return;
+        area.innerHTML=daftar.map(tp=>`<label class="flex gap-2 items-start"><input type="checkbox" class="tp-global" data-status="${status}" data-tp-index="${tp.index}"><span>TP ${tp.index}: ${escapeTP(tp.teks)}</span></label>`).join('')||'<span class="text-slate-400">Isi daftar TP terlebih dahulu.</span>';
+      });
+      document.querySelectorAll('#tbl-nilai-intra tr[data-nisn]').forEach(tr=>renderPilihanTPBaris(tr,JSON.parse(tr.dataset.tpTercapai||'[]'),JSON.parse(tr.dataset.tpTidak||'[]')));
+    }
+    function perbaruiDaftarTP(){renderPilihanTPGlobal();showToast('Daftar TP diperbarui. Periksa kembali pilihan.');}
+    function ubahModeTP(mode) {
+      modeTPPenerapan=mode; const panel=document.getElementById('tp-mode-semua'),info=document.getElementById('tp-mode-info');
+      if(panel)panel.classList.toggle('hidden',mode!=='semua');
+      if(info)info.innerText=mode==='semua'?'Mode semua siswa: tentukan pilihan TP di atas, lalu tekan Terapkan Pilihan.':'Mode individual: centang TP pada baris masing-masing siswa.';
+    }
+    function terapkanTPSemua() {
+      if(!daftarTPMaster().length)return showToast('Isi minimal satu TP terlebih dahulu.',true);
+      const rows=Array.from(document.querySelectorAll('#tbl-nilai-intra tr[data-nisn]'));
+      if(modeTPPenerapan==='individu'){showToast('Silakan tentukan pilihan TP pada setiap baris siswa.');return;}
+      const ya=Array.from(document.querySelectorAll('.tp-global[data-status="tercapai"]:checked')).map(x=>Number(x.dataset.tpIndex));
+      const tidak=Array.from(document.querySelectorAll('.tp-global[data-status="tidak"]:checked')).map(x=>Number(x.dataset.tpIndex));
+      if(ya.length>3||tidak.length>3)return showToast('Maksimal memilih 3 TP pada setiap kategori.',true);
+      if(ya.some(x=>tidak.includes(x)))return showToast('TP yang sama tidak boleh masuk dua kategori.',true);
+      rows.forEach(tr=>renderPilihanTPBaris(tr,ya,tidak)); showToast('Pilihan TP diterapkan kepada semua siswa.');
+    }
+
     function reloadNilaiIntraMapel(mapelValue) {
         const roleSekarang = String(state.user && state.user.role || '').trim().toLowerCase();
         const selectKelas = document.getElementById('filter-kelas-nilai');
@@ -1825,6 +1884,11 @@
             
             if(dataNilai) {
                 for(let i=1; i<=10; i++) {
+                    const master=document.getElementById(`master-tp-${i}`);
+                    if(master && dataNilai[`TP${i}`] && !master.value) master.value=String(dataNilai[`TP${i}`]).slice(0,100);
+                    hitungSisaTP(i);
+                }
+                for(let i=1; i<=10; i++) {
                     if(dataNilai[`S${i}`] !== undefined) tr.querySelector(`.val-s${i}`).value = dataNilai[`S${i}`];
                 }
                 if(dataNilai.Non_Tes !== undefined) tr.querySelector('.val-ntes').value = dataNilai.Non_Tes;
@@ -1833,10 +1897,20 @@
                 tr.querySelector('.val-angka').value = dataNilai.Nilai_Akhir || '';
                 tr.querySelector('.val-tercapai').value = dataNilai.Capaian_Tercapai || '';
                 tr.querySelector('.val-perlu').value = dataNilai.Capaian_Perlu_Peningkatan || '';
-                
+                let pilihanYa=[], pilihanTidak=[];
+                try { pilihanYa=JSON.parse(dataNilai.TP_Tercapai_JSON||'[]'); } catch(_){}
+                try { pilihanTidak=JSON.parse(dataNilai.TP_Tidak_Tercapai_JSON||'[]'); } catch(_){}
+                if(pilihanYa.length||pilihanTidak.length) renderPilihanTPBaris(tr,pilihanYa,pilihanTidak);
                 hitungNilai(nisn);
             }
         });
+        // Render ulang pilihan setelah daftar TP bersama dimuat dari data.
+        document.querySelectorAll('#tbl-nilai-intra tr[data-nisn]').forEach(tr => {
+          if (tr.dataset.tpTercapai || tr.dataset.tpTidak) {
+            renderPilihanTPBaris(tr, JSON.parse(tr.dataset.tpTercapai || '[]'), JSON.parse(tr.dataset.tpTidak || '[]'));
+          }
+        });
+        renderPilihanTPGlobal();
     }
 
 
@@ -2286,8 +2360,8 @@
           <td class="py-1 px-1 border-r border-slate-200"><input type="number" onkeyup="hitungNilai('${s.NISN}')" class="val-tes w-14 border border-slate-300 rounded text-center text-sm py-1 focus:border-blue-500 outline-none"></td>
           <td class="py-2 px-2 text-center border-r border-slate-200 font-extrabold bg-amber-50 val-na-semester text-amber-700">-</td>
           <td class="py-2 px-2 text-center border-r border-slate-200 bg-blue-50"><input type="number" class="val-angka w-14 border-b-2 border-blue-500 bg-transparent text-center font-extrabold text-blue-800 outline-none" readonly></td>
-          <td class="py-1 px-2 border-r border-slate-200 min-w-[220px]"><textarea class="val-tercapai w-full border border-green-200 rounded-md px-2 py-1 text-xs focus:border-green-500 bg-green-50/50 outline-none" rows="2" placeholder="Menunjukkan penguasaan..."></textarea></td>
-          <td class="py-1 px-2 min-w-[220px]"><textarea class="val-perlu w-full border border-red-200 rounded-md px-2 py-1 text-xs focus:border-red-500 bg-red-50/50 outline-none" rows="2" placeholder="Perlu bimbingan dalam..."></textarea></td>
+          <td class="py-1 px-2 border-r border-slate-200 min-w-[230px]"><div class="tp-pilihan-tercapai text-xs space-y-1 max-h-36 overflow-y-auto"></div><textarea class="val-tercapai hidden"></textarea></td>
+          <td class="py-1 px-2 min-w-[230px]"><div class="tp-pilihan-tidak text-xs space-y-1 max-h-36 overflow-y-auto"></div><textarea class="val-perlu hidden"></textarea></td>
         </tr>`).join('');
         
         content.innerHTML = `
@@ -2309,21 +2383,24 @@
             <p class="text-xs text-blue-800 font-semibold"><i class="fas fa-info-circle mr-1.5 text-blue-500"></i> Rumus Rapor: (Rata-rata NA Sumatif Lingkup Materi + Rata-rata NA Akhir Semester) / 2</p>
           </div>
           <div class="p-5 bg-white border-b border-slate-200 flex flex-col gap-4 shadow-sm z-10 relative">
-            <h4 class="font-bold text-blue-800 text-sm flex items-center"><div class="bg-blue-100 p-1.5 rounded mr-2"><i class="fas fa-magic text-blue-600"></i></div> Input Tujuan Pembelajaran (TP) Cepat</h4>
-            <p class="text-xs text-slate-500 font-medium">Ketik TP di bawah ini lalu tekan tombol terapkan agar otomatis mengisi kolom deskripsi capaian semua siswa.</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label class="text-xs font-bold text-green-700 block mb-1.5">Capaian Tercapai (Tertinggi):</label>
-                <input type="text" id="bulk-tp-tercapai" class="w-full border border-green-300 rounded-lg px-3 py-2 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none" placeholder="Contoh: Menunjukkan penguasaan dalam...">
-              </div>
-              <div>
-                <label class="text-xs font-bold text-rose-700 block mb-1.5">Perlu Bimbingan (Terendah):</label>
-                <input type="text" id="bulk-tp-perlu" class="w-full border border-rose-300 rounded-lg px-3 py-2 text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-100 outline-none" placeholder="Contoh: Perlu bimbingan dalam...">
-              </div>
+            <h4 class="font-bold text-blue-800 text-sm"><i class="fas fa-bullseye mr-2"></i>Pengaturan Tujuan Pembelajaran (TP)</h4>
+            <p class="text-xs text-slate-500">Masukkan maksimal 10 TP. Setiap TP maksimal 100 karakter. Pilih apakah pilihan TP akan disamakan untuk semua siswa atau ditentukan satu per satu.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              ${Array.from({length:10},(_,i)=>`<div><label class="text-xs font-bold text-slate-700">TP ${i+1}</label><input type="text" id="master-tp-${i+1}" maxlength="100" oninput="hitungSisaTP(${i+1})" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Isi tujuan pembelajaran ${i+1}"><div class="text-right text-[10px] text-slate-500"><span id="sisa-tp-${i+1}">100</span> karakter tersisa</div></div>`).join('')}
             </div>
-            <div>
-              <button onclick="terapkanTPSemua()" class="mt-1 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm shadow-md font-bold transition-all"><i class="fas fa-check-double mr-1.5"></i> Terapkan ke Semua Siswa</button>
+            <div class="flex flex-wrap gap-4 items-center border-t pt-3">
+              <label class="text-sm font-semibold"><input type="radio" name="mode-tp" value="semua" checked onchange="ubahModeTP(this.value)"> Terapkan pilihan yang sama untuk semua siswa</label>
+              <label class="text-sm font-semibold"><input type="radio" name="mode-tp" value="individu" onchange="ubahModeTP(this.value)"> Pilih TP berbeda untuk setiap siswa</label>
             </div>
+            <div id="tp-mode-semua" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div><div class="text-xs font-bold text-green-700 mb-2">TP Tercapai (maksimal 3)</div><div id="tp-semua-tercapai" class="text-xs space-y-1"></div></div>
+              <div><div class="text-xs font-bold text-rose-700 mb-2">TP Tidak Tercapai (maksimal 3)</div><div id="tp-semua-tidak" class="text-xs space-y-1"></div></div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="terapkanTPSemua()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-bold"><i class="fas fa-check-double mr-1"></i> Terapkan Pilihan</button>
+              <button onclick="perbaruiDaftarTP()" class="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold">Perbarui Daftar TP</button>
+            </div>
+            <p id="tp-mode-info" class="text-xs text-slate-500">Mode semua siswa: tentukan pilihan TP di atas, lalu tekan Terapkan Pilihan.</p>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm text-left border-collapse">
@@ -2357,6 +2434,8 @@
         // pembatasan berdasarkan MAPEL yang dipilih. Tanpa pemanggilan awal
         // ini, daftar siswa masih mengikuti seluruh kelas yang diampu guru.
         if (type === 'intra') {
+          renderPilihanTPGlobal();
+          ubahModeTP('semua');
           const mapelAwal = document.getElementById('input-mapel');
           reloadNilaiIntraMapel(mapelAwal ? mapelAwal.value : '');
         }
@@ -2671,7 +2750,13 @@
                 Tes: tr.querySelector('.val-tes').value,
                 Nilai_Akhir: tr.querySelector('.val-angka').value, 
                 Capaian_Tercapai: tr.querySelector('.val-tercapai').value, 
-                Capaian_Perlu_Peningkatan: tr.querySelector('.val-perlu').value 
+                Capaian_Perlu_Peningkatan: tr.querySelector('.val-perlu').value,
+                TP1: document.getElementById('master-tp-1')?.value || '', TP2: document.getElementById('master-tp-2')?.value || '',
+                TP3: document.getElementById('master-tp-3')?.value || '', TP4: document.getElementById('master-tp-4')?.value || '',
+                TP5: document.getElementById('master-tp-5')?.value || '', TP6: document.getElementById('master-tp-6')?.value || '',
+                TP7: document.getElementById('master-tp-7')?.value || '', TP8: document.getElementById('master-tp-8')?.value || '',
+                TP9: document.getElementById('master-tp-9')?.value || '', TP10: document.getElementById('master-tp-10')?.value || '',
+                TP_Tercapai_JSON: tr.dataset.tpTercapai || '[]', TP_Tidak_Tercapai_JSON: tr.dataset.tpTidak || '[]'
              });
           }
         }); keys = ['NISN', 'Mata_Pelajaran', 'Tahun_Ajaran', 'Semester']; sheetName = 'NilaiIntra';
