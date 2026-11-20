@@ -1797,7 +1797,18 @@
         const area=document.getElementById(status==='tercapai'?'tp-semua-tercapai':'tp-semua-tidak'); if(!area)return;
         area.innerHTML=daftar.map(tp=>`<label class="flex gap-2 items-start"><input type="checkbox" class="tp-global" data-status="${status}" data-tp-index="${tp.index}"><span>TP ${tp.index}: ${escapeTP(tp.teks)}</span></label>`).join('')||'<span class="text-slate-400">Isi daftar TP terlebih dahulu.</span>';
       });
-      document.querySelectorAll('#tbl-nilai-intra tr[data-nisn]').forEach(tr=>renderPilihanTPBaris(tr,JSON.parse(tr.dataset.tpTercapai||'[]'),JSON.parse(tr.dataset.tpTidak||'[]')));
+      document.querySelectorAll('#tbl-nilai-intra tr[data-nisn]').forEach(tr=>{
+        const lamaTercapai=tr.querySelector('.val-tercapai')?.value || '';
+        const lamaTidak=tr.querySelector('.val-perlu')?.value || '';
+        const ya=JSON.parse(tr.dataset.tpTercapai||'[]');
+        const tidak=JSON.parse(tr.dataset.tpTidak||'[]');
+        renderPilihanTPBaris(tr,ya,tidak);
+        // Data lama yang belum memiliki indeks pilihan TP tetap dipertahankan.
+        if(tr.dataset.tpPilihanTersimpan!=='1') {
+          tr.querySelector('.val-tercapai').value=lamaTercapai;
+          tr.querySelector('.val-perlu').value=lamaTidak;
+        }
+      });
     }
     function perbaruiDaftarTP(){renderPilihanTPGlobal();showToast('Daftar TP diperbarui. Periksa kembali pilihan.');}
     function ubahModeTP(mode) {
@@ -1807,8 +1818,9 @@
     }
     function terapkanTPSemua() {
       if(!daftarTPMaster().length)return showToast('Isi minimal satu TP terlebih dahulu.',true);
-      const rows=Array.from(document.querySelectorAll('#tbl-nilai-intra tr[data-nisn]'));
+      const rows=Array.from(document.querySelectorAll('#tbl-nilai-intra tr[data-nisn]')).filter(tr=>tr.style.display!=='none');
       if(modeTPPenerapan==='individu'){showToast('Silakan tentukan pilihan TP pada setiap baris siswa.');return;}
+      if(!rows.length)return showToast('Tidak ada siswa pada filter kelas dan mata pelajaran yang dipilih.',true);
       const ya=Array.from(document.querySelectorAll('.tp-global[data-status="tercapai"]:checked')).map(x=>Number(x.dataset.tpIndex));
       const tidak=Array.from(document.querySelectorAll('.tp-global[data-status="tidak"]:checked')).map(x=>Number(x.dataset.tpIndex));
       if(ya.length>3||tidak.length>3)return showToast('Maksimal memilih 3 TP pada setiap kategori.',true);
@@ -1843,6 +1855,37 @@
           selectKelas.value = kelasDiampu.some(k => String(k.ID_Kelas) === String(nilaiSebelumnya)) ? nilaiSebelumnya : 'all';
         }
 
+        // Setiap kombinasi periode + mapel + kelas memiliki daftar TP sendiri.
+        // Kosongkan dahulu agar TP dari filter sebelumnya tidak tertinggal.
+        for(let i=1;i<=10;i++) {
+          const master=document.getElementById(`master-tp-${i}`);
+          if(master) master.value='';
+          hitungSisaTP(i);
+        }
+        const filterKelasAktif = selectKelas ? String(selectKelas.value || 'all').trim() : 'all';
+        if (mapelValue) {
+          const kelasSiswaByNisn = new Map((state.db.siswa || []).map(s => [String(s.NISN || '').trim(), String(s.ID_Kelas || '').trim()]));
+          const idKelasDiizinkan = new Set(kelasDiampu.map(k => String(k.ID_Kelas || '').trim()));
+          const kandidatTP = (state.db.nilaiIntra || []).filter(n => {
+            const cocokPeriode = (String(n.Tahun_Ajaran || '') === String(state.filter.ta || '') || !String(n.Tahun_Ajaran || '').trim()) &&
+              (String(n.Semester || '') === String(state.filter.sm || '') || !String(n.Semester || '').trim());
+            const cocokMapel = String(n.Mata_Pelajaran || '').trim().toLowerCase() === String(mapelValue || '').trim().toLowerCase();
+            const kelasSiswa = kelasSiswaByNisn.get(String(n.NISN || '').trim()) || '';
+            const cocokKelas = filterKelasAktif === 'all'
+              ? idKelasDiizinkan.has(kelasSiswa)
+              : kelasSiswa === filterKelasAktif;
+            const adaTP = Array.from({length:10},(_,i)=>String(n[`TP${i+1}`] || '').trim()).some(Boolean);
+            return cocokPeriode && cocokMapel && cocokKelas && adaTP;
+          });
+          if (kandidatTP.length) {
+            for(let i=1;i<=10;i++) {
+              const master=document.getElementById(`master-tp-${i}`);
+              if(master) master.value=String(kandidatTP[0][`TP${i}`] || '').slice(0,100);
+              hitungSisaTP(i);
+            }
+          }
+        }
+
         document.querySelectorAll('#tbl-nilai-intra tr[data-nisn]').forEach(tr => {
           const idKelasSiswa = String(tr.getAttribute('data-kelas') || '').trim();
           const kelasSiswaObj = (state.db.kelas || []).find(k =>
@@ -1866,9 +1909,12 @@
           }
         });
 
-        if (!mapelValue) return;
+        if (!mapelValue) { renderPilihanTPGlobal(); return; }
 
         document.querySelectorAll('#tbl-nilai-intra tr[data-nisn]').forEach(tr => {
+            tr.dataset.tpTercapai='[]';
+            tr.dataset.tpTidak='[]';
+            tr.dataset.tpPilihanTersimpan='0';
             const nisn = tr.getAttribute('data-nisn');
             const dataNilai = state.db.nilaiIntra.find(n => 
               n.NISN == nisn && 
@@ -1884,11 +1930,6 @@
             
             if(dataNilai) {
                 for(let i=1; i<=10; i++) {
-                    const master=document.getElementById(`master-tp-${i}`);
-                    if(master && dataNilai[`TP${i}`] && !master.value) master.value=String(dataNilai[`TP${i}`]).slice(0,100);
-                    hitungSisaTP(i);
-                }
-                for(let i=1; i<=10; i++) {
                     if(dataNilai[`S${i}`] !== undefined) tr.querySelector(`.val-s${i}`).value = dataNilai[`S${i}`];
                 }
                 if(dataNilai.Non_Tes !== undefined) tr.querySelector('.val-ntes').value = dataNilai.Non_Tes;
@@ -1900,7 +1941,10 @@
                 let pilihanYa=[], pilihanTidak=[];
                 try { pilihanYa=JSON.parse(dataNilai.TP_Tercapai_JSON||'[]'); } catch(_){}
                 try { pilihanTidak=JSON.parse(dataNilai.TP_Tidak_Tercapai_JSON||'[]'); } catch(_){}
-                if(pilihanYa.length||pilihanTidak.length) renderPilihanTPBaris(tr,pilihanYa,pilihanTidak);
+                if(pilihanYa.length||pilihanTidak.length) {
+                  tr.dataset.tpPilihanTersimpan='1';
+                  renderPilihanTPBaris(tr,pilihanYa,pilihanTidak);
+                }
                 hitungNilai(nisn);
             }
         });
@@ -2384,7 +2428,7 @@
           </div>
           <div class="p-5 bg-white border-b border-slate-200 flex flex-col gap-4 shadow-sm z-10 relative">
             <h4 class="font-bold text-blue-800 text-sm"><i class="fas fa-bullseye mr-2"></i>Pengaturan Tujuan Pembelajaran (TP)</h4>
-            <p class="text-xs text-slate-500">Masukkan maksimal 10 TP. Setiap TP maksimal 100 karakter. Pilih apakah pilihan TP akan disamakan untuk semua siswa atau ditentukan satu per satu.</p>
+            <p class="text-xs text-slate-500">Daftar TP dimuat sesuai filter kelas, mata pelajaran, tahun ajaran, dan semester. Masukkan maksimal 10 TP (maksimal 100 karakter per TP), lalu tentukan penerapannya untuk semua siswa pada filter aktif atau satu per satu.</p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               ${Array.from({length:10},(_,i)=>`<div><label class="text-xs font-bold text-slate-700">TP ${i+1}</label><input type="text" id="master-tp-${i+1}" maxlength="100" oninput="hitungSisaTP(${i+1})" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Isi tujuan pembelajaran ${i+1}"><div class="text-right text-[10px] text-slate-500"><span id="sisa-tp-${i+1}">100</span> karakter tersisa</div></div>`).join('')}
             </div>
@@ -2653,6 +2697,12 @@
       const tabAktif = document.querySelector('.tab-btn.active');
       const idTabAktif = tabAktif ? String(tabAktif.id || '').trim().toLowerCase() : '';
       let kelasMapel = [];
+
+      if (idTabAktif !== 'tab-koko' && idTabAktif !== 'tab-ekstra') {
+        // Filter kelas intrakurikuler juga memuat ulang TP dan nilai dari kelas terpilih.
+        reloadNilaiIntraMapel(mapelValue);
+        return;
+      }
 
       if (idTabAktif === 'tab-koko' || idTabAktif === 'tab-ekstra') {
         if (roleSekarang === 'admin') {
