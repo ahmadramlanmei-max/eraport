@@ -2686,14 +2686,7 @@
       });
     }
 
-    function terapkanTPSemua() {
-      const tpTercapai = document.getElementById('bulk-tp-tercapai').value;
-      const tpPerlu = document.getElementById('bulk-tp-perlu').value;
-      if(!tpTercapai && !tpPerlu) return showToast("Isi minimal satu TP terlebih dahulu!", true);
-      if(tpTercapai) document.querySelectorAll('.val-tercapai').forEach(el => el.value = tpTercapai);
-      if(tpPerlu) document.querySelectorAll('.val-perlu').forEach(el => el.value = tpPerlu);
-      showToast("Tujuan Pembelajaran berhasil diterapkan.");
-    }
+    // Fungsi terapkanTPSemua yang digunakan berada pada bagian pengaturan TP di atas.
 
     function simpanNilai(tipe) {
       const role = String(state.user && state.user.role || '').trim().toLowerCase();
