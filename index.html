@@ -4044,14 +4044,23 @@ function renderCatatan(container) {
       // state.db dapat berisi status lama (misalnya masih Diajukan) karena
       // Admin menyetujui nilai setelah Wali Kelas membuka aplikasi.
       try {
-        const dataStatusTerbaru = await new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .getInitialData(state.user.role, state.user.username, new Date().getTime());
+        const tokenStatus = localStorage.getItem('eraport_session_token') || '';
+        if (!tokenStatus) throw new Error('Sesi login tidak ditemukan. Silakan login kembali.');
+        const responseStatus = await fetch(WORKER_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'getStatusPersetujuanNilai',
+            args: [],
+            token: tokenStatus
+          })
         });
-        if (!dataStatusTerbaru || dataStatusTerbaru.success !== true || !dataStatusTerbaru.data) {
-          throw new Error((dataStatusTerbaru && dataStatusTerbaru.message) || 'Status persetujuan terbaru gagal dimuat.');
+        const rawStatus = await responseStatus.text();
+        let dataStatusTerbaru;
+        try { dataStatusTerbaru = JSON.parse(rawStatus); }
+        catch (_) { throw new Error('Respons status persetujuan bukan JSON.'); }
+        if (!responseStatus.ok || !dataStatusTerbaru || dataStatusTerbaru.success !== true || !dataStatusTerbaru.data) {
+          throw new Error((dataStatusTerbaru && dataStatusTerbaru.message) || ('Status persetujuan gagal dimuat (HTTP ' + responseStatus.status + ').'));
         }
         state.db.statusPersetujuanNilai = Array.isArray(dataStatusTerbaru.data.statusPersetujuanNilai)
           ? dataStatusTerbaru.data.statusPersetujuanNilai : [];
