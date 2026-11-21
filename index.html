@@ -1511,6 +1511,24 @@
       }).ajukanNilaiKokurikuler(state.user.username,kelasId,state.filter.ta,state.filter.sm);
     }
 
+    async function ajukanEkstrakurikulerUI() {
+      const role=String(state.user&&state.user.role||'').trim().toLowerCase();
+      if(role!=='wali kelas') return showToast('Pengajuan Ekstrakurikuler hanya dapat dilakukan oleh Wali Kelas.',true);
+      const kelasId=String(document.getElementById('filter-kelas-ekstra')?.value||'').trim();
+      const ekskul=String(document.getElementById('input-ekskul')?.value||'').trim();
+      if(!kelasId) return showToast('Pilih kelas terlebih dahulu.',true);
+      if(!ekskul) return showToast('Pilih nama Ekstrakurikuler terlebih dahulu.',true);
+      if(!await appConfirm(`Ajukan nilai ${ekskul} kelas ${kelasId} periode ${state.filter.ta} semester ${state.filter.sm} kepada Administrator? Setelah diajukan, nilai akan terkunci sampai dikembalikan untuk revisi.`,{title:'Ajukan Nilai Ekstrakurikuler'})) return;
+      showLoading(true,'Memeriksa kelengkapan dan mengajukan Ekstrakurikuler...');
+      google.script.run.withSuccessHandler(res=>{
+        showLoading(false);
+        showToast((res&&res.message)||'Proses selesai.',!(res&&res.success));
+        if(res&&res.success) fetchData(true);
+      }).withFailureHandler(err=>{
+        showLoading(false);showToast('Gagal mengajukan Ekstrakurikuler: '+((err&&err.message)||'Error server.'),true);
+      }).ajukanNilaiEkstrakurikuler(state.user.username,kelasId,ekskul,state.filter.ta,state.filter.sm);
+    }
+
     function renderDashboard(container) {
       const db = state.db;
       const pg = db.pengaturan || {};
@@ -2749,6 +2767,7 @@
              <button type="button" onclick="bukaImportNilaiExcel('Ekstra')" class="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md hover:bg-emerald-700 transition-all"><i class="fas fa-file-excel mr-2"></i>Import Nilai Excel</button>
              <button type="button" onclick="unduhTemplateNilaiExcel('Ekstra')" class="bg-slate-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md hover:bg-slate-700 transition-all"><i class="fas fa-download mr-2"></i>Template Excel</button>
              <button onclick="simpanNilai('Ekstra')" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all transform hover:-translate-y-0.5"><i class="fas fa-save mr-2"></i>Simpan Ekstrakurikuler</button>
+             ${String(state.user && state.user.role || '').trim().toLowerCase() === 'wali kelas' ? '<button type="button" onclick="ajukanEkstrakurikulerUI()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all"><i class="fas fa-paper-plane mr-2"></i>Ajukan ke Admin</button>' : ''}
           </div>`;
         muatPilihanEkstra();
       }
