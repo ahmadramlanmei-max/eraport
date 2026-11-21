@@ -339,6 +339,22 @@
       background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(10px);
     }
+
+
+    /* Dialog notifikasi aplikasi */
+    .app-dialog-backdrop{position:fixed;inset:0;z-index:250;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(15,23,42,.58);backdrop-filter:blur(7px);opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s ease}
+    .app-dialog-backdrop.is-open{opacity:1;visibility:visible}
+    .app-dialog-card{width:min(100%,460px);background:#fff;border:1px solid rgba(226,232,240,.9);border-radius:24px;box-shadow:0 28px 90px rgba(2,6,23,.28);transform:translateY(12px) scale(.98);transition:transform .2s ease;overflow:hidden}
+    .app-dialog-backdrop.is-open .app-dialog-card{transform:translateY(0) scale(1)}
+    .app-dialog-icon{width:54px;height:54px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:23px;flex:none}
+    .app-dialog-input{width:100%;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;color:#0f172a;outline:none;transition:border .15s,box-shadow .15s}
+    .app-dialog-input:focus{border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.12)}
+    .app-dialog-btn{border-radius:12px;padding:10px 17px;font-weight:800;font-size:13px;transition:transform .15s,filter .15s}
+    .app-dialog-btn:active{transform:scale(.97)}
+    #toast{left:20px;right:20px;bottom:22px;display:flex;justify-content:flex-end}
+    #toast-content{max-width:min(520px,100%);min-width:min(320px,100%);border-radius:16px!important;padding:14px 18px!important;box-shadow:0 16px 45px rgba(15,23,42,.18)!important;backdrop-filter:blur(12px)}
+    @media(max-width:640px){#toast{left:12px;right:12px;bottom:14px}#toast-content{min-width:0;width:100%}.app-dialog-card{border-radius:20px}}
+
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased">
@@ -357,6 +373,30 @@
       <i id="toast-icon" class="fas fa-check-circle text-emerald-400 text-xl"></i>
       <span id="toast-message" class="font-medium text-sm">Pesan notifikasi</span>
     </div>
+  </div>
+
+  <!-- Dialog konfirmasi, input, dan informasi aplikasi -->
+  <div id="app-dialog" class="app-dialog-backdrop" aria-hidden="true" role="presentation" onclick="appDialogBackdrop(event)">
+    <section class="app-dialog-card" role="dialog" aria-modal="true" aria-labelledby="app-dialog-title" aria-describedby="app-dialog-message">
+      <div class="p-6 sm:p-7">
+        <div class="flex items-start gap-4">
+          <div id="app-dialog-icon" class="app-dialog-icon bg-blue-50 text-blue-700"><i class="fas fa-circle-info"></i></div>
+          <div class="min-w-0 flex-1 pt-1">
+            <h3 id="app-dialog-title" class="text-lg font-extrabold text-slate-900">Konfirmasi</h3>
+            <p id="app-dialog-message" class="mt-2 text-sm leading-6 text-slate-600 whitespace-pre-line">Apakah Anda yakin?</p>
+          </div>
+        </div>
+        <div id="app-dialog-input-wrap" class="hidden mt-5">
+          <label id="app-dialog-input-label" for="app-dialog-input" class="block text-xs font-extrabold text-slate-600 mb-2">Isian</label>
+          <textarea id="app-dialog-input" class="app-dialog-input min-h-[92px] resize-y" rows="3" placeholder="Ketik di sini..."></textarea>
+        </div>
+        <div class="flex justify-end gap-2 mt-7">
+          <button id="app-dialog-cancel" type="button" class="app-dialog-btn bg-slate-100 hover:bg-slate-200 text-slate-700">Batal</button>
+          <button id="app-dialog-ok" type="button" class="app-dialog-btn bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20">Lanjutkan</button>
+        </div>
+      </div>
+      <div class="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500"></div>
+    </section>
   </div>
 
   <!-- Login Screen -->
@@ -772,24 +812,78 @@
       }
     }
     
-    function showToast(message, isError = false) {
-      const toast = document.getElementById('toast'); 
+    let toastTimer = null;
+    function showToast(message, isError = false, duration = 3800) {
+      const toast = document.getElementById('toast');
       const toastContent = document.getElementById('toast-content');
-      document.getElementById('toast-message').innerText = message;
-      
+      const messageEl = document.getElementById('toast-message');
       const icon = document.getElementById('toast-icon');
-      if (isError) {
-        icon.className = 'fas fa-exclamation-circle text-rose-500 text-xl';
-        toastContent.className = 'bg-white text-slate-800 px-6 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 border-l-4 border-rose-500';
-      } else {
-        icon.className = 'fas fa-check-circle text-emerald-500 text-xl';
-        toastContent.className = 'bg-white text-slate-800 px-6 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 border-l-4 border-emerald-500';
-      }
-      
-      toast.classList.remove('translate-y-24', 'opacity-0'); 
-      setTimeout(() => toast.classList.add('translate-y-24', 'opacity-0'), 3500);
+      if (!toast || !toastContent || !messageEl || !icon) return;
+      messageEl.textContent = String(message || (isError ? 'Terjadi kesalahan.' : 'Proses berhasil.'));
+      icon.className = isError ? 'fas fa-circle-exclamation text-rose-500 text-xl' : 'fas fa-circle-check text-emerald-500 text-xl';
+      toastContent.className = isError
+        ? 'bg-white text-slate-800 px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-rose-100 border-l-4 border-l-rose-500'
+        : 'bg-white text-slate-800 px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-100 border-l-4 border-l-emerald-500';
+      toast.classList.remove('translate-y-24', 'opacity-0');
+      toast.setAttribute('role', isError ? 'alert' : 'status');
+      toast.setAttribute('aria-live', isError ? 'assertive' : 'polite');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.add('translate-y-24', 'opacity-0'), duration);
     }
-    
+
+    let appDialogResolver = null;
+    let appDialogMode = 'confirm';
+    function openAppDialog(options = {}) {
+      const dialog = document.getElementById('app-dialog');
+      const title = document.getElementById('app-dialog-title');
+      const message = document.getElementById('app-dialog-message');
+      const icon = document.getElementById('app-dialog-icon');
+      const inputWrap = document.getElementById('app-dialog-input-wrap');
+      const input = document.getElementById('app-dialog-input');
+      const cancel = document.getElementById('app-dialog-cancel');
+      const ok = document.getElementById('app-dialog-ok');
+      if (!dialog) return Promise.resolve(appDialogMode === 'prompt' ? null : false);
+      if (appDialogResolver) finishAppDialog(null);
+      appDialogMode = options.type || 'confirm';
+      title.textContent = options.title || (appDialogMode === 'prompt' ? 'Input Data' : appDialogMode === 'alert' ? 'Informasi' : 'Konfirmasi');
+      message.textContent = String(options.message || '');
+      const iconClass = options.icon || (appDialogMode === 'alert' ? 'fa-circle-info' : appDialogMode === 'prompt' ? 'fa-pen-to-square' : 'fa-circle-question');
+      icon.className = 'app-dialog-icon ' + (appDialogMode === 'alert' ? 'bg-blue-50 text-blue-700' : appDialogMode === 'prompt' ? 'bg-violet-50 text-violet-700' : 'bg-amber-50 text-amber-700');
+      icon.innerHTML = '<i class="fas ' + iconClass + '"></i>';
+      inputWrap.classList.toggle('hidden', appDialogMode !== 'prompt');
+      input.value = options.value == null ? '' : String(options.value);
+      input.placeholder = options.placeholder || 'Ketik di sini...';
+      document.getElementById('app-dialog-input-label').textContent = options.label || 'Keterangan';
+      cancel.classList.toggle('hidden', appDialogMode === 'alert');
+      ok.textContent = options.okText || (appDialogMode === 'alert' ? 'Mengerti' : appDialogMode === 'prompt' ? 'Simpan' : 'Ya, Lanjutkan');
+      ok.className = 'app-dialog-btn text-white shadow-lg ' + (options.danger ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20');
+      dialog.classList.add('is-open');
+      dialog.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      return new Promise(resolve => {
+        appDialogResolver = resolve;
+        ok.onclick = () => finishAppDialog(appDialogMode === 'prompt' ? input.value : true);
+        cancel.onclick = () => finishAppDialog(appDialogMode === 'prompt' ? null : false);
+        input.onkeydown = event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); finishAppDialog(input.value); } };
+        const focusTarget = appDialogMode === 'prompt' ? input : ok;
+        setTimeout(() => focusTarget.focus(), 80);
+      });
+    }
+    function finishAppDialog(result) {
+      const dialog = document.getElementById('app-dialog');
+      if (dialog) { dialog.classList.remove('is-open'); dialog.setAttribute('aria-hidden', 'true'); }
+      document.body.style.overflow = '';
+      const resolve = appDialogResolver; appDialogResolver = null;
+      if (resolve) resolve(result);
+    }
+    function appDialogBackdrop(event) {
+      if (event.target !== event.currentTarget || !appDialogResolver) return;
+      finishAppDialog(appDialogMode === 'prompt' ? null : false);
+    }
+    function appConfirm(message, options = {}) { return openAppDialog({...options, type:'confirm', message}); }
+    function appPrompt(message, value = '', options = {}) { return openAppDialog({...options, type:'prompt', message, value}); }
+    function appAlert(message, options = {}) { return openAppDialog({...options, type:'alert', message}); }
+
     function toggleSidebar() { 
       document.getElementById('sidebar').classList.toggle('-translate-x-full'); 
       document.getElementById('sidebar-overlay').classList.toggle('hidden'); 
@@ -1159,12 +1253,12 @@
         .simpanPemetaanAkademik('mapelMaster',{Nama_Mapel:nama,Urutan:urutan,Aksi:'tambah'},state.user.username);
     }
 
-    function editMasterMapel(id) {
+    async function editMasterMapel(id) {
       const item=(state.db.masterMapel||[]).find(x=>String(x.ID_Mapel)===String(id));
       if(!item) return;
-      const nama=prompt('Ubah nama mata pelajaran:',item.Nama_Mapel||'');
+      const nama=await appPrompt('Ubah nama mata pelajaran:',item.Nama_Mapel||'',{title:'Ubah Mata Pelajaran'});
       if(nama===null) return;
-      const urutan=prompt('Nomor urutan mata pelajaran:',item.Urutan||'');
+      const urutan=await appPrompt('Nomor urutan mata pelajaran:',item.Urutan||'',{title:'Atur Urutan'});
       if(urutan===null) return;
       showLoading(true,'Memperbarui mata pelajaran...');
       google.script.run.withSuccessHandler(res=>{
@@ -1181,10 +1275,10 @@
       jalankanAksiPemetaan('mapelMaster',{ID_Mapel:id,Aksi:'hapus'},'hapus');
     }
 
-    function ubahStatusMasterMapel(id,aksi) {
+    async function ubahStatusMasterMapel(id,aksi) {
       const item=(state.db.masterMapel||[]).find(x=>String(x.ID_Mapel)===String(id));
       if(!item) return;
-      if(!confirm((aksi==='nonaktifkan'?'Nonaktifkan':'Aktifkan')+' mata pelajaran '+item.Nama_Mapel+'?')) return;
+      if(!await appConfirm((aksi==='nonaktifkan'?'Nonaktifkan':'Aktifkan')+' mata pelajaran '+item.Nama_Mapel+'?',{title:'Konfirmasi Status',danger:aksi==='nonaktifkan'})) return;
       showLoading(true,'Memperbarui status mata pelajaran...');
       google.script.run.withSuccessHandler(res=>{
         showLoading(false);
@@ -1213,8 +1307,8 @@
     }
 
 
-    function jalankanAksiPemetaan(jenis,payload,aksi) {
-      if(!confirm(aksi==='hapus'?'Yakin ingin menghapus data ini?':'Simpan perubahan data ini?')) return;
+    async function jalankanAksiPemetaan(jenis,payload,aksi) {
+      if(!await appConfirm(aksi==='hapus'?'Yakin ingin menghapus data ini?':'Simpan perubahan data ini?',{title:aksi==='hapus'?'Konfirmasi Hapus':'Konfirmasi Perubahan',danger:aksi==='hapus'})) return;
       payload=Object.assign({},payload,{Aksi:aksi});
       showLoading(true,aksi==='hapus'?'Menghapus data pemetaan...':'Memperbarui data pemetaan...');
       google.script.run.withSuccessHandler(res=>{
@@ -1224,9 +1318,9 @@
       }).withFailureHandler(err=>{showLoading(false);showToast((err&&err.message)||'Kesalahan server.',true);})
         .simpanPemetaanAkademik(jenis,payload,state.user.username);
     }
-    function editPemetaanMaster(jenis,nilai,idField,id) {
+    async function editPemetaanMaster(jenis,nilai,idField,id) {
       const label=jenis==='dimensi'?'Dimensi':jenis==='tema'?'Tema projek':'Nama ekstrakurikuler';
-      const baru=prompt('Ubah '+label+':',nilai||'');
+      const baru=await appPrompt('Ubah '+label+':',nilai||'',{title:'Ubah Data'});
       if(baru===null||!baru.trim())return;
       const field=jenis==='dimensi'?'Dimensi':jenis==='tema'?'Tema_Projek':'Nama_Ekskul';
       const p={[field]:baru.trim(),NilaiLama:nilai};
@@ -1238,30 +1332,30 @@
       const p={NilaiLama:nilai}; if(idField&&id)p[idField]=id;
       jalankanAksiPemetaan(jenis,p,'hapus');
     }
-    function editPemetaanIntra(ta,sm,kelas,mapel) {
-      const kelasBaru=prompt('ID kelas baru (kosongkan jika tetap):',kelas);
+    async function editPemetaanIntra(ta,sm,kelas,mapel) {
+      const kelasBaru=await appPrompt('ID kelas baru (kosongkan jika tetap):',kelas,{title:'Ubah Kelas'});
       if(kelasBaru===null)return;
-      const mapelBaru=prompt('Mata pelajaran baru:',mapel);
+      const mapelBaru=await appPrompt('Mata pelajaran baru:',mapel,{title:'Ubah Mata Pelajaran'});
       if(mapelBaru===null||!mapelBaru.trim())return;
       jalankanAksiPemetaan('intra',{Lama:{Tahun_Ajaran:ta,Semester:sm,ID_Kelas:kelas,Mata_Pelajaran:mapel},Tahun_Ajaran:ta,Semester:sm,ID_Kelas:kelasBaru||kelas,Mata_Pelajaran:mapelBaru.trim()},'edit');
     }
     function hapusPemetaanIntra(ta,sm,kelas,mapel) {
       jalankanAksiPemetaan('intra',{Lama:{Tahun_Ajaran:ta,Semester:sm,ID_Kelas:kelas,Mata_Pelajaran:mapel}},'hapus');
     }
-    function editKelompokProjek(id,nama,kelas,tema,ta,sm) {
+    async function editKelompokProjek(id,nama,kelas,tema,ta,sm) {
       const baris=(state.db.kelompokProjek||[]).filter(x=>String(x.ID_Projek)===String(id));
       const dimensiLama=[...new Set(baris.flatMap(x=>String(x.Dimensi_P5||'').split(';').map(d=>d.trim()).filter(Boolean)))];
-      const baru=prompt('Ubah nama kelompok:',nama); if(baru===null||!baru.trim())return;
-      const dimInput=prompt('Masukkan dimensi projek. Pisahkan setiap dimensi dengan titik koma (;):',dimensiLama.join('; ')); if(dimInput===null)return;
+      const baru=await appPrompt('Ubah nama kelompok:',nama,{title:'Ubah Kelompok Projek'}); if(baru===null||!baru.trim())return;
+      const dimInput=await appPrompt('Masukkan dimensi projek. Pisahkan setiap dimensi dengan titik koma (;):',dimensiLama.join('; '),{title:'Atur Dimensi Projek'}); if(dimInput===null)return;
       const dimBaru=[...new Set(dimInput.split(';').map(d=>d.trim()).filter(Boolean))];
       if(!dimBaru.length)return showToast('Pilih minimal satu dimensi projek.',true);
-      const temaBaru=prompt('Ubah tema projek:',tema); if(temaBaru===null||!temaBaru.trim())return;
+      const temaBaru=await appPrompt('Ubah tema projek:',tema,{title:'Ubah Tema Projek'}); if(temaBaru===null||!temaBaru.trim())return;
       const anggota=[...new Set(baris.map(x=>normalisasiNISNFront(x.NISN)).filter(Boolean))];
       jalankanAksiPemetaan('kelompok',{ID_Projek:id,Tahun_Ajaran:ta,Semester:sm,ID_Kelas:kelas,Nama_Kelompok:baru.trim(),Dimensi_P5:dimBaru,Tema_Projek:temaBaru,NISN:anggota},'edit');
     }
     function hapusKelompokProjek(id) { jalankanAksiPemetaan('kelompok',{ID_Projek:id},'hapus'); }
-    function editPilihanEkstra(ta,sm,nisn,nama) {
-      const baru=prompt('Ubah nama ekstrakurikuler:',nama); if(baru===null||!baru.trim())return;
+    async function editPilihanEkstra(ta,sm,nisn,nama) {
+      const baru=await appPrompt('Ubah nama ekstrakurikuler:',nama,{title:'Ubah Ekstrakurikuler'}); if(baru===null||!baru.trim())return;
       jalankanAksiPemetaan('ekstraSiswa',{Tahun_Ajaran:ta,Semester:sm,NISN:nisn,Nama_Ekskul:nama,Nama_EkskulBaru:baru.trim()},'edit');
     }
     function hapusPilihanEkstra(ta,sm,nisn,nama) {
@@ -1352,10 +1446,10 @@
         .getMonitoringNilaiGuru(ta, sm, state.user.username);
     }
 
-    function prosesPersetujuanNilaiUI(guru, mapel, kelasId, ta, sm, keputusan) {
+    async function prosesPersetujuanNilaiUI(guru, mapel, kelasId, ta, sm, keputusan) {
       const catatan = keputusan === 'Perlu Revisi'
-        ? (prompt('Tuliskan catatan perbaikan untuk guru:', 'Mohon periksa dan lengkapi kembali nilai.') || '')
-        : (confirm(`Setujui nilai ${mapel} untuk kelas ${kelasId} periode ${ta} semester ${sm}? Nilai akan dikunci.`) ? '' : null);
+        ? ((await appPrompt('Tuliskan catatan perbaikan untuk guru:', 'Mohon periksa dan lengkapi kembali nilai.',{title:'Catatan Revisi'})) || '')
+        : (await appConfirm(`Setujui nilai ${mapel} untuk kelas ${kelasId} periode ${ta} semester ${sm}? Nilai akan dikunci.`,{title:'Setujui dan Kunci Nilai'})) ? '' : null;
       if (catatan === null) return;
       if (keputusan === 'Perlu Revisi' && !catatan.trim()) return showToast('Catatan revisi wajib diisi.', true);
       showLoading(true, 'Memproses persetujuan nilai...');
@@ -1368,11 +1462,11 @@
       }).prosesPersetujuanNilai(state.user.username, guru, mapel, kelasId, ta, sm, keputusan, catatan);
     }
 
-    function bukaKunciNilaiUI(guru, mapel, kelasId, ta, sm) {
-      const alasan = prompt(`Tuliskan alasan wajib pembukaan kunci nilai ${mapel}, kelas ${kelasId}, periode ${ta} semester ${sm}:`);
+    async function bukaKunciNilaiUI(guru, mapel, kelasId, ta, sm) {
+      const alasan = await appPrompt(`Tuliskan alasan wajib pembukaan kunci nilai ${mapel}, kelas ${kelasId}, periode ${ta} semester ${sm}:`, '', {title:'Alasan Buka Kunci'});
       if (alasan === null) return;
       if (!String(alasan).trim()) return showToast('Alasan pembukaan kunci wajib diisi.', true);
-      if (!confirm('Buka kembali kunci nilai ini? Guru akan dapat mengubah nilai setelah status menjadi Perlu Revisi.')) return;
+      if (!await appConfirm('Buka kembali kunci nilai ini? Guru akan dapat mengubah nilai setelah status menjadi Perlu Revisi.',{title:'Konfirmasi Buka Kunci',danger:true})) return;
       showLoading(true, 'Membuka kunci nilai...');
       google.script.run.withSuccessHandler(res => {
         showLoading(false);
@@ -1383,14 +1477,14 @@
       }).bukaKunciNilai(state.user.username, guru, mapel, kelasId, ta, sm, alasan.trim());
     }
 
-    function ajukanNilaiKeAdmin() {
+    async function ajukanNilaiKeAdmin() {
       const role = String(state.user && state.user.role || '').trim().toLowerCase();
       if (role === 'admin') return showToast('Akun Administrator tidak mengajukan nilai guru.', true);
       const mapel = String(document.getElementById('input-mapel')?.value || '').trim();
       const kelasId = String(document.getElementById('filter-kelas-nilai')?.value || '').trim();
       if (!mapel) return showToast('Pilih mata pelajaran terlebih dahulu.', true);
       if (!kelasId || kelasId === 'all') return showToast('Pilih satu kelas terlebih dahulu, bukan Semua Kelas.', true);
-      if (!confirm(`Ajukan nilai ${mapel} kelas ${kelasId} periode ${state.filter.ta} semester ${state.filter.sm} kepada Administrator? Pastikan seluruh nilai sudah benar.`)) return;
+      if (!await appConfirm(`Ajukan nilai ${mapel} kelas ${kelasId} periode ${state.filter.ta} semester ${state.filter.sm} kepada Administrator? Pastikan seluruh nilai sudah benar.`,{title:'Konfirmasi Pengajuan'})) return;
       showLoading(true, 'Memeriksa kelengkapan dan mengajukan nilai...');
       google.script.run.withSuccessHandler(res => {
         showLoading(false);
@@ -3376,7 +3470,7 @@ function renderCatatan(container) {
       const payload = { Nama_Sekolah: document.getElementById('pg-sekolah').value, Alamat_Sekolah: document.getElementById('pg-alamat').value, Kepala_Sekolah: document.getElementById('pg-kepsek').value, NIP_Kepsek: document.getElementById('pg-nipkepsek').value, Tahun_Ajaran: document.getElementById('pg-tahun').value, Semester: document.getElementById('pg-semester').value, Tanggal_Raport: document.getElementById('pg-tglraport').value, URL_Logo: document.getElementById('pg-logo').value };
       showLoading(true, "Menyimpan..."); google.script.run.withSuccessHandler(res => { showToast(res.message, !res.success); setTimeout(() => fetchData(true), 800); }).simpanPengaturan(payload);
     }
-    function prosesKenaikanKelasMassal() {
+    async function prosesKenaikanKelasMassal() {
       const taBaru = document.getElementById('input-ta-baru').value.trim();
       if(!taBaru) return showToast("Tahun Ajaran Baru harus diisi!", true);
 
@@ -3385,7 +3479,7 @@ function renderCatatan(container) {
          return showToast("Rollover hanya bisa dieksekusi saat filter Semester Aktif adalah 'Genap'.", true);
       }
 
-      if(!confirm(`PERINGATAN: Siswa akan dinaikkan ke kelas berikutnya dan Tahun Ajaran akan otomatis diubah ke ${taBaru}. Lanjutkan?`)) return;
+      if(!await appConfirm(`PERINGATAN: Siswa akan dinaikkan ke kelas berikutnya dan Tahun Ajaran akan otomatis diubah ke ${taBaru}. Lanjutkan?`,{title:'Konfirmasi Kenaikan Kelas',danger:true})) return;
 
       showLoading(true, "Memproses Kenaikan Kelas Massal...");
       
@@ -3403,12 +3497,12 @@ function renderCatatan(container) {
         showToast("Koneksi gagal: " + (err.message || 'Error Server'), true);
       }).prosesRolloverKenaikan(state.filter.ta, taBaru);
     }
-    function jalankanPemulihanRollover() {
+    async function jalankanPemulihanRollover() {
       const batch = document.getElementById('input-batch-pulih').value.trim();
       const nisn = document.getElementById('input-nisn-pulih').value.trim();
       if (!batch) return showToast('Kode Riwayat Rollover wajib diisi.', true);
       const cakupan = nisn ? ('siswa dengan NISN ' + nisn) : 'SELURUH siswa pada batch ' + batch;
-      if (!confirm('PERINGATAN: Kelas ' + cakupan + ' akan dikembalikan ke kelas asal sesuai riwayat. Lanjutkan?')) return;
+      if (!await appConfirm('PERINGATAN: Kelas ' + cakupan + ' akan dikembalikan ke kelas asal sesuai riwayat. Lanjutkan?',{title:'Konfirmasi Pemulihan',danger:true})) return;
       showLoading(true, 'Memulihkan kelas siswa...');
       google.script.run.withSuccessHandler(res => {
         showLoading(false);
@@ -3420,11 +3514,11 @@ function renderCatatan(container) {
       }).pulihkanRollover(batch, nisn);
     }
 
-    function prosesArsipData() {
+    async function prosesArsipData() {
       const taArsip = document.getElementById('input-ta-arsip').value.trim();
       if(!taArsip) return showToast("Tahun Ajaran yang akan diarsipkan harus diisi!", true);
 
-      if(!confirm(`PERINGATAN CUT-PASTE: Seluruh data akademik (Nilai Intra, P5, Ekstra, Kehadiran) pada Tahun Ajaran ${taArsip} akan dipindahkan ke tab Arsip. Loading aplikasi akan menjadi lebih ringan. Lanjutkan?`)) return;
+      if(!await appConfirm(`PERINGATAN CUT-PASTE: Seluruh data akademik (Nilai Intra, P5, Ekstra, Kehadiran) pada Tahun Ajaran ${taArsip} akan dipindahkan ke tab Arsip. Loading aplikasi akan menjadi lebih ringan. Lanjutkan?`,{title:'Konfirmasi Arsip Data',danger:true})) return;
 
       showLoading(true, "Memindahkan data ke Sheet Arsip...");
       
@@ -4243,7 +4337,7 @@ function renderCatatan(container) {
       // Tampilkan area rapor dan jalankan dialog cetak browser.
       const pa = document.getElementById('print-area');
       if (!pa) {
-        alert('Area cetak tidak ditemukan. Muat ulang aplikasi dan coba kembali.');
+        await appAlert('Area cetak tidak ditemukan. Muat ulang aplikasi dan coba kembali.',{title:'Area Cetak Tidak Ditemukan'});
         return;
       }
       pa.innerHTML = printHTML;
@@ -4285,13 +4379,13 @@ function renderCatatan(container) {
 
   <script>
     // --- KUMPULAN FUNGSI FITUR BARU ---
-    function prosesKenaikanKelasMassal() {
+    async function prosesKenaikanKelasMassal() {
       const taBaru = document.getElementById('input-ta-baru').value.trim();
       if(!taBaru) return showToast("Tahun Ajaran Baru harus diisi!", true);
       if (String(state.filter.sm).toLowerCase() !== 'genap') {
          return showToast("Rollover hanya bisa dieksekusi saat filter Semester Aktif adalah 'Genap'.", true);
       }
-      if(!confirm(`PERINGATAN: Siswa akan dinaikkan ke kelas berikutnya dan Tahun Ajaran akan otomatis diubah ke ${taBaru}. Lanjutkan?`)) return;
+      if(!await appConfirm(`PERINGATAN: Siswa akan dinaikkan ke kelas berikutnya dan Tahun Ajaran akan otomatis diubah ke ${taBaru}. Lanjutkan?`,{title:'Konfirmasi Kenaikan Kelas',danger:true})) return;
       showLoading(true, "Memproses Kenaikan Kelas Massal...");
       google.script.run.withSuccessHandler(res => {
         showLoading(false);
@@ -4302,10 +4396,10 @@ function renderCatatan(container) {
       }).prosesRolloverKenaikan(state.filter.ta, taBaru);
     }
 
-    function prosesArsipData() {
+    async function prosesArsipData() {
       const taArsip = document.getElementById('input-ta-arsip').value.trim();
       if(!taArsip) return showToast("Tahun Ajaran yang akan diarsipkan harus diisi!", true);
-      if(!confirm(`PERINGATAN CUT-PASTE: Seluruh data akademik (Nilai, P5, Kehadiran) pada Tahun Ajaran ${taArsip} akan dipindahkan ke tab Arsip. Lanjutkan?`)) return;
+      if(!await appConfirm(`PERINGATAN CUT-PASTE: Seluruh data akademik (Nilai, P5, Kehadiran) pada Tahun Ajaran ${taArsip} akan dipindahkan ke tab Arsip. Lanjutkan?`,{title:'Konfirmasi Arsip Data',danger:true})) return;
       showLoading(true, "Memindahkan data ke Sheet Arsip...");
       google.script.run.withSuccessHandler(res => {
         showLoading(false);
