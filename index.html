@@ -4040,6 +4040,26 @@ function renderCatatan(container) {
     }
 
     async function cetakRaport(nisn, dataHistoris = null) {
+      // Status persetujuan harus dimuat ulang tepat sebelum cetak.
+      // state.db dapat berisi status lama (misalnya masih Diajukan) karena
+      // Admin menyetujui nilai setelah Wali Kelas membuka aplikasi.
+      try {
+        const dataStatusTerbaru = await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .getInitialData(state.user.role, state.user.username, new Date().getTime());
+        });
+        if (!dataStatusTerbaru || dataStatusTerbaru.success !== true || !dataStatusTerbaru.data) {
+          throw new Error((dataStatusTerbaru && dataStatusTerbaru.message) || 'Status persetujuan terbaru gagal dimuat.');
+        }
+        state.db.statusPersetujuanNilai = Array.isArray(dataStatusTerbaru.data.statusPersetujuanNilai)
+          ? dataStatusTerbaru.data.statusPersetujuanNilai : [];
+      } catch (error) {
+        showToast('Status persetujuan gagal diperbarui. Cetak rapor dibatalkan agar nilai tidak salah ditampilkan: ' + (error.message || error), true);
+        return;
+      }
+
       if (!dataHistoris) {
         try { await refreshPrintDataFromFirestore({ nisn: String(nisn) }); }
         catch (error) { showToast('Data cetak gagal dimuat dari Firestore: ' + (error.message || error), true); return; }
