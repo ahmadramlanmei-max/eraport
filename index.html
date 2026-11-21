@@ -1302,23 +1302,36 @@
           const filterKelas = filterKelasLama === 'all' || !kelasUnik.some(x => String(x.kelasToken).toLowerCase() === filterKelasLama.toLowerCase()) ? 'all' : filterKelasLama;
           const rowsData = data.filter(r => filterKelas === 'all' || String(r.kelasToken || '').toLowerCase() === filterKelas.toLowerCase());
 
-          const rows = rowsData.map((r, i) => `
-            <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+          const isAdmin = role === 'admin';
+          const rows = rowsData.map((r, i) => {
+            const enc = value => encodeURIComponent(String(value == null ? '' : value));
+            const status = String(r.status || 'Belum Lengkap');
+            const statusClass = status === 'Disetujui' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : status === 'Diajukan' ? 'bg-blue-50 text-blue-700 border-blue-200'
+              : status === 'Perlu Revisi' ? 'bg-amber-50 text-amber-700 border-amber-200'
+              : 'bg-slate-50 text-slate-600 border-slate-200';
+            const statusIcon = status === 'Disetujui' ? 'fa-lock' : status === 'Diajukan' ? 'fa-paper-plane' : status === 'Perlu Revisi' ? 'fa-rotate-left' : 'fa-clock';
+            const actions = isAdmin && status === 'Diajukan' ? `
+              <div class="flex flex-wrap justify-center gap-2">
+                <button onclick="prosesPersetujuanNilaiUI(decodeURIComponent('${enc(r.username)}'),decodeURIComponent('${enc(r.mapel)}'),decodeURIComponent('${enc(r.kelasToken)}'),decodeURIComponent('${enc(ta)}'),decodeURIComponent('${enc(sm)}'),'Disetujui')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fas fa-check mr-1"></i>Setujui</button>
+                <button onclick="prosesPersetujuanNilaiUI(decodeURIComponent('${enc(r.username)}'),decodeURIComponent('${enc(r.mapel)}'),decodeURIComponent('${enc(r.kelasToken)}'),decodeURIComponent('${enc(ta)}'),decodeURIComponent('${enc(sm)}'),'Perlu Revisi')" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fas fa-undo mr-1"></i>Kembalikan</button>
+              </div>` : (status === 'Disetujui' ? '<span class="text-emerald-700 text-xs font-bold"><i class="fas fa-lock mr-1"></i>Terkunci</span>' : '<span class="text-slate-400 text-xs">-</span>');
+            return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
               <td class="py-3 px-4 text-center font-bold text-slate-500">${i + 1}</td>
               <td class="py-3 px-4 font-bold text-slate-800">${escapeHtml(r.mapel || '-')}</td>
               <td class="py-3 px-4 font-semibold text-slate-800">${escapeHtml(r.nama || '-')}</td>
               <td class="py-3 px-4 text-slate-600 font-medium">${escapeHtml(r.username || '-')}</td>
               <td class="py-3 px-4 text-slate-600">${escapeHtml(r.kelas || '-')}</td>
-              <td class="py-3 px-4 text-center">${r.status === 'Sudah Kirim'
-                ? '<span class="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg font-extrabold text-xs"><i class="fas fa-check-circle"></i> Sudah Kirim</span>'
-                : '<span class="inline-flex items-center gap-2 bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-lg font-extrabold text-xs"><i class="fas fa-times-circle"></i> Belum Kirim</span>'}</td>
-            </tr>`).join('');
+              <td class="py-3 px-4 text-center"><span class="inline-flex items-center gap-2 border px-3 py-1.5 rounded-lg font-extrabold text-xs ${statusClass}"><i class="fas ${statusIcon}"></i>${escapeHtml(status)}</span><div class="text-[11px] text-slate-400 mt-1">${Number(r.nilaiTerisi||0)}/${Number(r.totalSiswa||0)} siswa</div>${r.catatanAdmin ? `<div class="text-xs text-amber-700 mt-1">${escapeHtml(r.catatanAdmin)}</div>` : ''}</td>
+              <td class="py-3 px-4 text-center">${actions}</td>
+            </tr>`;
+          }).join('');
 
           const opsi = '<option value="all">Semua Kelas</option>' + kelasUnik.map(x => `<option value="${escapeHtml(x.kelasToken)}" ${filterKelas.toLowerCase() === String(x.kelasToken).toLowerCase() ? 'selected' : ''}>${escapeHtml(x.kelas)}</option>`).join('');
 
           container.innerHTML = `<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden fade-in">
             <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
-              <div class="flex items-center gap-3"><div class="bg-emerald-100 p-2.5 rounded-xl text-emerald-600"><i class="fas fa-clipboard-check text-xl"></i></div><div><h2 class="font-extrabold text-slate-800 text-lg tracking-tight">Monitoring Pengiriman Nilai Guru</h2><p class="text-sm text-slate-500 mt-1 font-medium">Status dihitung per guru, mapel, dan kelas.</p></div></div>
+              <div class="flex items-center gap-3"><div class="bg-emerald-100 p-2.5 rounded-xl text-emerald-600"><i class="fas fa-clipboard-check text-xl"></i></div><div><h2 class="font-extrabold text-slate-800 text-lg tracking-tight">Monitoring Pengiriman Nilai Guru</h2><p class="text-sm text-slate-500 mt-1 font-medium">Administrator memeriksa pengajuan nilai guru per mapel, kelas, dan periode.</p></div></div>
               <button onclick="renderMonitoringNilai(document.getElementById('content-area'))" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-md text-sm font-bold transition-all"><i class="fas fa-sync-alt mr-1.5"></i> Refresh Status</button>
             </div>
             <div class="px-6 py-4 bg-blue-50/60 border-b border-blue-100 flex flex-wrap items-center gap-4 text-sm">
@@ -1327,14 +1340,48 @@
               <label class="font-bold text-blue-900 ml-auto">Filter Kelas:</label>
               <select id="${filterId}" onchange="renderMonitoringNilai(document.getElementById('content-area'))" class="bg-white border border-blue-200 px-3 py-1.5 rounded-lg font-bold text-blue-700 outline-none focus:ring-2 focus:ring-blue-200 min-w-[170px]">${opsi}</select>
             </div>
-            <div class="px-6 py-3 bg-slate-50 border-b border-slate-100 text-xs text-slate-500 font-medium">Status "Sudah Kirim" berarti seluruh siswa pada kelas tersebut sudah memiliki nilai untuk mapel tersebut. Mapel lain yang diampu guru tidak memengaruhi status.</div>
-            <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-100 text-slate-600 uppercase text-xs font-extrabold border-b border-slate-200 tracking-wider"><tr><th class="py-4 px-4 text-center w-14">No</th><th class="py-4 px-4">Mata Pelajaran</th><th class="py-4 px-4">Nama</th><th class="py-4 px-4">Guru</th><th class="py-4 px-4">Kelas</th><th class="py-4 px-4 text-center">Status</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="text-center py-12 text-slate-400 font-medium">Belum ada data penugasan guru yang dapat dipantau.</td></tr>'}</tbody></table></div>
+            <div class="px-6 py-3 bg-slate-50 border-b border-slate-100 text-xs text-slate-500 font-medium">Guru hanya dapat mengajukan nilai setelah seluruh siswa memiliki nilai akhir. Nilai yang disetujui Administrator otomatis terkunci. Wali Kelas dapat memantau, sedangkan keputusan persetujuan hanya milik Administrator.</div>
+            <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-100 text-slate-600 uppercase text-xs font-extrabold border-b border-slate-200 tracking-wider"><tr><th class="py-4 px-4 text-center w-14">No</th><th class="py-4 px-4">Mata Pelajaran</th><th class="py-4 px-4">Nama</th><th class="py-4 px-4">Guru</th><th class="py-4 px-4">Kelas</th><th class="py-4 px-4 text-center">Status</th><th class="py-4 px-4 text-center">Tindakan Admin</th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="text-center py-12 text-slate-400 font-medium">Belum ada data penugasan guru yang dapat dipantau.</td></tr>'}</tbody></table></div>
           </div>`;
         })
         .withFailureHandler(function(err) {
           container.innerHTML = `<div class="p-6 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl font-bold">Gagal membaca monitoring nilai: ${escapeHtml((err && err.message) || 'Error server.')}</div>`;
         })
         .getMonitoringNilaiGuru(ta, sm, state.user.username);
+    }
+
+    function prosesPersetujuanNilaiUI(guru, mapel, kelasId, ta, sm, keputusan) {
+      const catatan = keputusan === 'Perlu Revisi'
+        ? (prompt('Tuliskan catatan perbaikan untuk guru:', 'Mohon periksa dan lengkapi kembali nilai.') || '')
+        : (confirm(`Setujui nilai ${mapel} untuk kelas ${kelasId} periode ${ta} semester ${sm}? Nilai akan dikunci.`) ? '' : null);
+      if (catatan === null) return;
+      if (keputusan === 'Perlu Revisi' && !catatan.trim()) return showToast('Catatan revisi wajib diisi.', true);
+      showLoading(true, 'Memproses persetujuan nilai...');
+      google.script.run.withSuccessHandler(res => {
+        showLoading(false);
+        showToast((res && res.message) || 'Proses selesai.', !(res && res.success));
+        if (res && res.success) renderMonitoringNilai(document.getElementById('content-area'));
+      }).withFailureHandler(err => {
+        showLoading(false); showToast('Gagal memproses persetujuan: ' + ((err && err.message) || 'Error server.'), true);
+      }).prosesPersetujuanNilai(state.user.username, guru, mapel, kelasId, ta, sm, keputusan, catatan);
+    }
+
+    function ajukanNilaiKeAdmin() {
+      const role = String(state.user && state.user.role || '').trim().toLowerCase();
+      if (role === 'admin') return showToast('Akun Administrator tidak mengajukan nilai guru.', true);
+      const mapel = String(document.getElementById('input-mapel')?.value || '').trim();
+      const kelasId = String(document.getElementById('filter-kelas-nilai')?.value || '').trim();
+      if (!mapel) return showToast('Pilih mata pelajaran terlebih dahulu.', true);
+      if (!kelasId || kelasId === 'all') return showToast('Pilih satu kelas terlebih dahulu, bukan Semua Kelas.', true);
+      if (!confirm(`Ajukan nilai ${mapel} kelas ${kelasId} periode ${state.filter.ta} semester ${state.filter.sm} kepada Administrator? Pastikan seluruh nilai sudah benar.`)) return;
+      showLoading(true, 'Memeriksa kelengkapan dan mengajukan nilai...');
+      google.script.run.withSuccessHandler(res => {
+        showLoading(false);
+        showToast((res && res.message) || 'Pengajuan selesai.', !(res && res.success));
+        if (res && res.success) setTimeout(() => fetchData(true), 500);
+      }).withFailureHandler(err => {
+        showLoading(false); showToast('Gagal mengajukan nilai: ' + ((err && err.message) || 'Error server.'), true);
+      }).ajukanNilaiGuru(state.user.username, mapel, kelasId, state.filter.ta, state.filter.sm);
     }
 
     function renderDashboard(container) {
@@ -2472,6 +2519,7 @@
              <button type="button" onclick="bukaImportNilaiExcel('Intra')" class="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md hover:bg-emerald-700 transition-all"><i class="fas fa-file-excel mr-2"></i>Import Nilai Excel</button>
              <button type="button" onclick="unduhTemplateNilaiExcel('Intra')" class="bg-slate-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md hover:bg-slate-700 transition-all"><i class="fas fa-download mr-2"></i>Template Excel</button>
              <button onclick="simpanNilai('Intra')" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all transform hover:-translate-y-0.5"><i class="fas fa-save mr-2"></i>Simpan Nilai Akademik</button>
+             ${String(state.user && state.user.role || '').trim().toLowerCase() !== 'admin' ? '<button type="button" onclick="ajukanNilaiKeAdmin()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all"><i class="fas fa-paper-plane mr-2"></i>Ajukan ke Admin</button>' : ''}
           </div>`;
 
         // Penting: setelah tabel Input Nilai dibuat, langsung terapkan
@@ -4008,7 +4056,7 @@ function renderCatatan(container) {
           <thead class="raport-print-shell-head">
             <tr><td style="border:0; padding:0; vertical-align:top;">
         <div class="raport-running-header">
-          <h1>LAPORAN HASIL BELAJAR</h1>
+          <h1>LAPORAN HASIL BELAJAR (RAPOR)</h1>
           ${dataHistoris ? '<div style="text-align:center;font-size:9pt;font-weight:bold;margin:3px 0 7px;">SALINAN / CETAK ULANG</div>' : ''}
           <table>
             <tr>
