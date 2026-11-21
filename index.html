@@ -660,7 +660,7 @@
 
     let state = { 
       user: null, 
-      db: { pengaturan: {}, kelas: [], siswa: [], kehadiran: [], nilaiIntra: [], nilaiKoko: [], nilaiEkstra: [], catatanWali: [], users: [], pemetaanIntra: [], dimensiP5: [], temaProjek: [], kelompokProjek: [], masterEkstra: [], pemetaanEkstra: [] }, 
+      db: { pengaturan: {}, kelas: [], siswa: [], kehadiran: [], nilaiIntra: [], nilaiKoko: [], nilaiEkstra: [], catatanWali: [], users: [], pemetaanIntra: [], dimensiP5: [], temaProjek: [], kelompokProjek: [], masterEkstra: [], pemetaanEkstra: [], statusPersetujuanNilai: [] }, 
       currentView: 'dashboard', 
       filter: { ta: '', sm: '' } 
     };
@@ -4078,13 +4078,29 @@ function renderCatatan(container) {
       let isGenapValue = String(printFilter.sm || p.Semester || '').trim().toLowerCase();
       const isGenap = (isGenapValue === 'genap');
 
-      // Ambil nilai hanya untuk siswa yang sedang dicetak dan kelasnya.
-      // Jika data nilai lama tidak memiliki ID_Kelas, tetap gunakan NISN agar kompatibel.
+      // RAPOR RESMI: hanya tampilkan nilai dengan status Disetujui Admin.
+      // Status dibaca dari sheet StatusPersetujuanNilai, bukan ditebak dari kelengkapan nilai.
+      const daftarStatusPersetujuan = Array.isArray(printDb.statusPersetujuanNilai)
+        ? printDb.statusPersetujuanNilai : [];
+      const normStatusRapor = v => String(v == null ? '' : v).trim().toLowerCase();
+      const statusNilaiDisetujui = (mapelStatus, kelasStatus, usernameStatus) =>
+        daftarStatusPersetujuan.some(st =>
+          normStatusRapor(st.Status) === 'disetujui' &&
+          normStatusRapor(st.Mata_Pelajaran) === normStatusRapor(mapelStatus) &&
+          String(st.ID_Kelas || '').trim() === String(kelasStatus || '').trim() &&
+          normStatusRapor(st.Tahun_Ajaran) === normStatusRapor(printFilter.ta) &&
+          normStatusRapor(st.Semester) === normStatusRapor(printFilter.sm) &&
+          (!usernameStatus || normStatusRapor(st.Username_Guru) === normStatusRapor(usernameStatus))
+        );
+      const usernameWaliRapor = String(kls.Wali_Kelas_Username || '').trim();
+
+      // Ambil nilai Intrakurikuler hanya jika mapel + kelas + periode telah disetujui.
       const nIntraRaw = (printDb.nilaiIntra || []).filter(x =>
         normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) &&
         (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) &&
         (x.Semester == printFilter.sm || !x.Semester) &&
-        (!x.ID_Kelas || String(x.ID_Kelas).trim() === String(s.ID_Kelas).trim())
+        (!x.ID_Kelas || String(x.ID_Kelas).trim() === String(s.ID_Kelas).trim()) &&
+        statusNilaiDisetujui(x.Mata_Pelajaran, x.ID_Kelas || s.ID_Kelas, '')
       );
 
       // Urutan rapor mengikuti urutan Daftar Mata Pelajaran pada Input Nilai.
@@ -4110,7 +4126,8 @@ function renderCatatan(container) {
       const nKokoRaw = (printDb.nilaiKoko || []).filter(x =>
         normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) &&
         (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) &&
-        (x.Semester == printFilter.sm || !x.Semester)
+        (x.Semester == printFilter.sm || !x.Semester) &&
+        statusNilaiDisetujui('Kokurikuler', x.ID_Kelas || s.ID_Kelas, usernameWaliRapor)
       );
 
       const kelompokKoko = new Map();
@@ -4140,7 +4157,12 @@ function renderCatatan(container) {
       });
 
       const nKoko = Array.from(kelompokKoko.values());
-      const nEkstra = (printDb.nilaiEkstra || []).filter(x => normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) && (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) && (x.Semester == printFilter.sm || !x.Semester));
+      const nEkstra = (printDb.nilaiEkstra || []).filter(x =>
+        normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) &&
+        (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) &&
+        (x.Semester == printFilter.sm || !x.Semester) &&
+        statusNilaiDisetujui('Ekstrakurikuler: ' + String(x.Nama_Ekskul || '').trim(), x.ID_Kelas || s.ID_Kelas, usernameWaliRapor)
+      );
       // Utamakan catatan pada semester aktif. Jika belum ada keputusan di semester aktif,
       // cari keputusan Lulus pada tahun ajaran yang sama agar tetap terbaca saat mencetak rapor.
       const normalisasiKunciCatatan = value =>
