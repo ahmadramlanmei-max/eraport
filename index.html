@@ -1315,7 +1315,9 @@
               <div class="flex flex-wrap justify-center gap-2">
                 <button onclick="prosesPersetujuanNilaiUI(decodeURIComponent('${enc(r.username)}'),decodeURIComponent('${enc(r.mapel)}'),decodeURIComponent('${enc(r.kelasToken)}'),decodeURIComponent('${enc(ta)}'),decodeURIComponent('${enc(sm)}'),'Disetujui')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fas fa-check mr-1"></i>Setujui</button>
                 <button onclick="prosesPersetujuanNilaiUI(decodeURIComponent('${enc(r.username)}'),decodeURIComponent('${enc(r.mapel)}'),decodeURIComponent('${enc(r.kelasToken)}'),decodeURIComponent('${enc(ta)}'),decodeURIComponent('${enc(sm)}'),'Perlu Revisi')" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fas fa-undo mr-1"></i>Kembalikan</button>
-              </div>` : (status === 'Disetujui' ? '<span class="text-emerald-700 text-xs font-bold"><i class="fas fa-lock mr-1"></i>Terkunci</span>' : '<span class="text-slate-400 text-xs">-</span>');
+              </div>` : (isAdmin && status === 'Disetujui' ? `
+              <div class="flex flex-col items-center gap-2"><span class="text-emerald-700 text-xs font-bold"><i class="fas fa-lock mr-1"></i>Terkunci</span>
+              <button onclick="bukaKunciNilaiUI(decodeURIComponent('${enc(r.username)}'),decodeURIComponent('${enc(r.mapel)}'),decodeURIComponent('${enc(r.kelasToken)}'),decodeURIComponent('${enc(ta)}'),decodeURIComponent('${enc(sm)}'))" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fas fa-unlock mr-1"></i>Buka Kunci</button></div>` : (status === 'Disetujui' ? '<span class="text-emerald-700 text-xs font-bold"><i class="fas fa-lock mr-1"></i>Terkunci</span>' : '<span class="text-slate-400 text-xs">-</span>'));
             return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
               <td class="py-3 px-4 text-center font-bold text-slate-500">${i + 1}</td>
               <td class="py-3 px-4 font-bold text-slate-800">${escapeHtml(r.mapel || '-')}</td>
@@ -1364,6 +1366,21 @@
       }).withFailureHandler(err => {
         showLoading(false); showToast('Gagal memproses persetujuan: ' + ((err && err.message) || 'Error server.'), true);
       }).prosesPersetujuanNilai(state.user.username, guru, mapel, kelasId, ta, sm, keputusan, catatan);
+    }
+
+    function bukaKunciNilaiUI(guru, mapel, kelasId, ta, sm) {
+      const alasan = prompt(`Tuliskan alasan wajib pembukaan kunci nilai ${mapel}, kelas ${kelasId}, periode ${ta} semester ${sm}:`);
+      if (alasan === null) return;
+      if (!String(alasan).trim()) return showToast('Alasan pembukaan kunci wajib diisi.', true);
+      if (!confirm('Buka kembali kunci nilai ini? Guru akan dapat mengubah nilai setelah status menjadi Perlu Revisi.')) return;
+      showLoading(true, 'Membuka kunci nilai...');
+      google.script.run.withSuccessHandler(res => {
+        showLoading(false);
+        showToast((res && res.message) || 'Proses selesai.', !(res && res.success));
+        if (res && res.success) renderMonitoringNilai(document.getElementById('content-area'));
+      }).withFailureHandler(err => {
+        showLoading(false); showToast('Gagal membuka kunci: ' + ((err && err.message) || 'Error server.'), true);
+      }).bukaKunciNilai(state.user.username, guru, mapel, kelasId, ta, sm, alasan.trim());
     }
 
     function ajukanNilaiKeAdmin() {
