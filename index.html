@@ -1495,6 +1495,22 @@
       }).ajukanNilaiGuru(state.user.username, mapel, kelasId, state.filter.ta, state.filter.sm);
     }
 
+    async function ajukanKokurikulerUI() {
+      const role=String(state.user&&state.user.role||'').trim().toLowerCase();
+      if(role!=='wali kelas') return showToast('Pengajuan Kokurikuler hanya dapat dilakukan oleh Wali Kelas.',true);
+      const kelasId=String(document.getElementById('filter-kelas-koko')?.value||'').trim();
+      if(!kelasId) return showToast('Pilih kelas terlebih dahulu.',true);
+      if(!await appConfirm('Ajukan seluruh nilai Kokurikuler kelas ini kepada Administrator? Setelah diajukan, nilai akan terkunci sampai dikembalikan untuk revisi.',{title:'Ajukan Nilai Kokurikuler'})) return;
+      showLoading(true,'Memeriksa kelengkapan dan mengajukan Kokurikuler...');
+      google.script.run.withSuccessHandler(res=>{
+        showLoading(false);
+        showToast((res&&res.message)||'Proses selesai.',!(res&&res.success));
+        if(res&&res.success) fetchData(true);
+      }).withFailureHandler(err=>{
+        showLoading(false);showToast('Gagal mengajukan Kokurikuler: '+((err&&err.message)||'Error server.'),true);
+      }).ajukanNilaiKokurikuler(state.user.username,kelasId,state.filter.ta,state.filter.sm);
+    }
+
     function renderDashboard(container) {
       const db = state.db;
       const pg = db.pengaturan || {};
