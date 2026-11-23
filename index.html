@@ -654,7 +654,10 @@
       ['kelas','siswa','users','kehadiran','nilaiIntra','nilaiKoko','nilaiEkstra','catatanWali','masterMapel'].forEach(k => {
         if (Array.isArray(d[k])) state.db[k] = d[k];
       });
-      if (d.pengaturan && typeof d.pengaturan === 'object') state.db.pengaturan = d.pengaturan;
+      // Identitas sekolah (Nama_Sekolah, Alamat_Sekolah, Kepala_Sekolah,
+      // NIP_Kepsek, URL_Logo, dan tanggal rapor) tetap memakai Pengaturan
+      // dari getInitialData() yang dibaca langsung dari Google Spreadsheet.
+      // Jangan menimpanya dengan snapshot Firestore yang mungkin belum sinkron.
       return true;
     }
 
@@ -4209,19 +4212,14 @@ function renderCatatan(container) {
 
       // Urutan rapor mengikuti master mapel, tetapi mapel agama dibatasi
       // hanya pada agama siswa yang sedang dicetak.
-      const urutanMapel = (printDb.masterMapel||[])
-        .filter(x=>{
-          if(String(x.Status||'Aktif').toLowerCase()!=='aktif') return false;
-          const agamaMapel = agamaUntukMapelFront(x.Nama_Mapel);
+      // Gunakan satu sumber urutan yang sama dengan leger:
+      // Pendidikan Agama siswa ditempatkan pertama, mapel lain mengikuti
+      // angka Urutan MasterMapel tanpa mengubah data master.
+      const urutanMapel = getUrutanMasterMapelAktif(printDb)
+        .filter(nama => {
+          const agamaMapel = agamaUntukMapelFront(nama);
           return !agamaMapel || (!!agamaSiswaRapor && agamaMapel === agamaSiswaRapor);
-        })
-        .sort((a,b)=>{
-          const ua=Number(a.Urutan), ub=Number(b.Urutan);
-          const na=Number.isFinite(ua)&&String(a.Urutan).trim()!==''?ua:999999;
-          const nb=Number.isFinite(ub)&&String(b.Urutan).trim()!==''?ub:999999;
-          return na-nb;
-        })
-        .map(x=>String(x.Nama_Mapel||'').trim()).filter(Boolean);
+        });
 
       const indexMapel = mapel => {
         const i = urutanMapel.findIndex(m => mapelSama(m, mapel));
