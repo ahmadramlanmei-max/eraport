@@ -2596,6 +2596,11 @@
         let standarMapel = (state.db.masterMapel||[])
           .filter(m=>String(m.Status||'Aktif').toLowerCase()==='aktif')
           .sort((a,b)=>{
+          // Pendidikan Agama siswa ditempatkan pada urutan pertama.
+          // Mata pelajaran selain agama tetap mengikuti Urutan MasterMapel.
+          const agamaA = agamaUntukMapelFront(a.Nama_Mapel) ? 0 : 1;
+          const agamaB = agamaUntukMapelFront(b.Nama_Mapel) ? 0 : 1;
+          if (agamaA !== agamaB) return agamaA - agamaB;
           const ua=Number(a.Urutan), ub=Number(b.Urutan);
           const na=Number.isFinite(ua)&&String(a.Urutan).trim()!==''?ua:999999;
           const nb=Number.isFinite(ub)&&String(b.Urutan).trim()!==''?ub:999999;
@@ -3736,6 +3741,11 @@ function renderCatatan(container) {
         }))
         .filter(m => !!m.nama)
         .sort((a, b) => {
+          // Pendidikan Agama selalu menjadi mapel nomor 1 pada rapor/leger.
+          // Mapel lainnya tetap mengikuti Urutan MasterMapel tanpa diubah.
+          const agamaA = agamaUntukMapelFront(a.nama) ? 0 : 1;
+          const agamaB = agamaUntukMapelFront(b.nama) ? 0 : 1;
+          if (agamaA !== agamaB) return agamaA - agamaB;
           const ua = Number.isFinite(a.urutan) && String(a.urutan) !== '' ? a.urutan : 999999;
           const ub = Number.isFinite(b.urutan) && String(b.urutan) !== '' ? b.urutan : 999999;
           return ua - ub || a.index - b.index;
