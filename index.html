@@ -546,7 +546,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div><label class="block text-sm font-semibold text-slate-600 mb-1">Tempat Lahir</label><input type="text" id="input-tempatlahir" class="w-full border border-slate-200 rounded-xl px-4 py-2 focus:border-blue-500 outline-none"></div>
               <div><label class="block text-sm font-semibold text-slate-600 mb-1">Tanggal Lahir</label><input type="date" id="input-tgllahir" class="w-full border border-slate-200 rounded-xl px-4 py-2 focus:border-blue-500 outline-none"></div>
-              <div><label class="block text-sm font-semibold text-slate-600 mb-1">Agama</label><input type="text" id="input-agama" placeholder="Contoh: Islam" class="w-full border border-slate-200 rounded-xl px-4 py-2 focus:border-blue-500 outline-none"></div>
+              <div><label class="block text-sm font-semibold text-slate-600 mb-1">Agama <span class="text-rose-600">*</span></label><select id="input-agama" required class="w-full border border-slate-200 rounded-xl px-4 py-2 focus:border-blue-500 outline-none bg-white"><option value="">-- Pilih Agama --</option><option value="Islam">Islam</option><option value="Kristen">Kristen</option><option value="Katolik">Katolik</option><option value="Hindu">Hindu</option><option value="Buddha">Buddha</option><option value="Konghucu">Konghucu</option></select><p class="text-xs text-slate-500 mt-1">Agama wajib dilengkapi agar siswa dapat dipetakan ke mata pelajaran agama yang sesuai.</p></div>
               <div class="md:col-span-2"><label class="block text-sm font-semibold text-slate-600 mb-1">Alamat Lengkap Siswa</label><input type="text" id="input-alamat" class="w-full border border-slate-200 rounded-xl px-4 py-2 focus:border-blue-500 outline-none"></div>
               <div><label class="block text-sm font-semibold text-slate-600 mb-1">Nama Ayah</label><input type="text" id="input-ayah" class="w-full border border-slate-200 rounded-xl px-4 py-2 focus:border-blue-500 outline-none"></div>
               <div><label class="block text-sm font-semibold text-slate-600 mb-1">Nama Ibu</label><input type="text" id="input-ibu" class="w-full border border-slate-200 rounded-xl px-4 py-2 focus:border-blue-500 outline-none"></div>
@@ -774,7 +774,9 @@
     }
 
     function getMapelDiampuGuru() {
-      return Object.keys(getPenugasanMapelKelasGuru());
+      // Penugasan mapel agama generik lama tidak lagi dapat dipilih untuk input baru.
+      return Object.keys(getPenugasanMapelKelasGuru())
+        .filter(m=>normPenugasan(m)!=='pendidikanagamadanbudipekerti');
     }
 
     // Loading overlay diperbaiki: tutup langsung saat proses selesai.
@@ -1720,7 +1722,7 @@
           
           document.getElementById('input-tempatlahir').value = siswa.Tempat_Lahir || ''; 
           document.getElementById('input-tgllahir').value = siswa.Tanggal_Lahir ? new Date(siswa.Tanggal_Lahir).toISOString().split('T')[0] : ''; 
-          document.getElementById('input-agama').value = siswa.Agama || ''; 
+          document.getElementById('input-agama').value = normalisasiAgamaFront(siswa.Agama) || ''; 
           document.getElementById('input-alamat').value = siswa.Alamat || ''; 
           document.getElementById('input-ayah').value = siswa.Nama_Ayah || ''; 
           document.getElementById('input-ibu').value = siswa.Nama_Ibu || ''; 
@@ -1736,6 +1738,7 @@
         document.getElementById('input-nisn').dataset.nisnLama = '';
         document.getElementById('input-nisn').readOnly = false; 
         document.getElementById('input-nisn').classList.remove('bg-slate-100', 'text-slate-500', 'cursor-not-allowed');
+        document.getElementById('input-agama').value = '';
       }
     }
     
@@ -1745,8 +1748,26 @@
       setTimeout(() => modal.classList.add('hidden'), 300);
     }
     
+    function normalisasiAgamaFront(value) {
+      const key=String(value||'').trim().toLowerCase().replace(/[^a-z]/g,'');
+      const alias={islam:'Islam',kristen:'Kristen',kristenprotestan:'Kristen',protestan:'Kristen',katolik:'Katolik',hindu:'Hindu',buddha:'Buddha',budha:'Buddha',konghucu:'Konghucu',khonghucu:'Konghucu'};
+      return alias[key]||'';
+    }
+    function agamaUntukMapelFront(mapel) {
+      const key=String(mapel||'').toLowerCase().replace(/[^a-z]/g,'');
+      if(!key.startsWith('pendidikanagama')) return '';
+      if(key.includes('islam')) return 'Islam';
+      if(key.includes('kristen')) return 'Kristen';
+      if(key.includes('katolik')) return 'Katolik';
+      if(key.includes('hindu')) return 'Hindu';
+      if(key.includes('buddha')||key.includes('budha')) return 'Buddha';
+      if(key.includes('konghucu')||key.includes('khonghucu')) return 'Konghucu';
+      return '';
+    }
     function submitSiswa(e) {
-      e.preventDefault(); 
+      e.preventDefault();
+      const agama=normalisasiAgamaFront(document.getElementById('input-agama').value);
+      if(!agama) return showToast('Pilih agama siswa terlebih dahulu. Data siswa belum dapat disimpan.',true);
       const payload = { 
         NISN: document.getElementById('input-nisn').value, 
         NISN_LAMA: document.getElementById('input-nisn').dataset.nisnLama || '',
@@ -1756,7 +1777,7 @@
         ID_Kelas: document.getElementById('input-kelas').value,
         Tempat_Lahir: document.getElementById('input-tempatlahir').value,
         Tanggal_Lahir: document.getElementById('input-tgllahir').value,
-        Agama: document.getElementById('input-agama').value,
+        Agama: agama,
         Alamat: document.getElementById('input-alamat').value,
         Nama_Ayah: document.getElementById('input-ayah').value,
         Nama_Ibu: document.getElementById('input-ibu').value,
@@ -2039,6 +2060,8 @@
     }
 
     function reloadNilaiIntraMapel(mapelValue) {
+        const infoAgama=document.getElementById('info-filter-agama');
+        if(infoAgama) infoAgama.textContent='';
         const roleSekarang = String(state.user && state.user.role || '').trim().toLowerCase();
         const selectKelas = document.getElementById('filter-kelas-nilai');
         let kelasDiampu = roleSekarang === 'admin'
@@ -2108,7 +2131,11 @@
           });
           const filterKelas = selectKelas ? String(selectKelas.value || 'all').trim() : 'all';
           const bolehFilter = filterKelas === 'all' || filterKelas === idKelasSiswa;
-          tr.style.display = (bolehMapel && bolehFilter) ? '' : 'none';
+          const agamaWajib=agamaUntukMapelFront(mapelValue);
+          const siswaRow=(state.db.siswa||[]).find(s=>normalisasiNISNFront(s.NISN)===normalisasiNISNFront(tr.getAttribute('data-nisn')));
+          const agamaSiswa=normalisasiAgamaFront(siswaRow&&siswaRow.Agama);
+          const cocokAgama=!agamaWajib ? String(mapelValue||'').trim().toLowerCase()!=='pendidikan agama dan budi pekerti' : agamaSiswa===agamaWajib;
+          tr.style.display = (bolehMapel && bolehFilter && cocokAgama) ? '' : 'none';
         });
 
         let nomor = 1;
@@ -2120,6 +2147,12 @@
         });
 
         if (!mapelValue) { renderPilihanTPGlobal(); return; }
+        const agamaTerpilih=agamaUntukMapelFront(mapelValue);
+        if(agamaTerpilih){
+          const jumlahCocok=Array.from(document.querySelectorAll('#tbl-nilai-intra tr[data-nisn]')).filter(tr=>tr.style.display!=='none').length;
+          const info=document.getElementById('info-filter-agama');
+          if(info) info.textContent=jumlahCocok?`Menampilkan ${jumlahCocok} siswa beragama ${agamaTerpilih}. Siswa dengan agama berbeda atau belum diisi disembunyikan.`:`Tidak ada siswa beragama ${agamaTerpilih} pada kelas yang dipilih. Siswa tanpa agama tidak dapat menerima nilai agama.`;
+        }
 
         document.querySelectorAll('#tbl-nilai-intra tr[data-nisn]').forEach(tr => {
             tr.dataset.tpTercapai='[]';
@@ -2574,7 +2607,7 @@
         } else if (role !== 'admin') {
           const me = state.db.users.find(u => u.Username === state.user.username);
           if (me && me.Mapel_Diampu && String(me.Mapel_Diampu).trim() !== '') {
-             String(me.Mapel_Diampu).split(',').map(s => s.trim()).filter(Boolean).forEach(m => {
+             String(me.Mapel_Diampu).split(',').map(s => s.trim()).filter(m => Boolean(m) && normPenugasan(m)!=='pendidikanagamadanbudipekerti').forEach(m => {
                 let found = standarMapel.find(sm => sm.val.toLowerCase() === m.toLowerCase() || sm.label.toLowerCase() === m.toLowerCase() || sm.val.includes(m));
                 opsiMapel += `<option value="${escapeHtml(found ? found.val : m)}">${escapeHtml(found ? found.label : m)}</option>`;
              });
@@ -2631,6 +2664,7 @@
               <select id="input-mapel" class="border-2 border-blue-400 rounded-lg px-4 py-2 focus:border-blue-600 bg-white shadow-sm font-bold text-blue-800 outline-none transition-all" onchange="reloadNilaiIntraMapel(this.value)">
                 ${opsiMapel}
               </select>
+              <p id="info-filter-agama" class="text-xs text-amber-700 mt-1"></p>
             </div>
           </div>
           <div class="bg-blue-50/50 p-3 border-b border-blue-100 flex items-center">
@@ -3883,8 +3917,12 @@ function renderCatatan(container) {
       // Hanya mapel yang memiliki data pada kelas yang dicetak, tetapi tetap mengikuti urutan mapel rapor.
       const semuaNilai = siswa.flatMap(s => getNilaiIntraLeger(s.NISN, s.ID_Kelas));
       const mapelAktif = [];
-      URUTAN_MAPEL_LEGER.forEach(m => {
-        if (semuaNilai.some(n => mapelSama(n.Mata_Pelajaran, m))) mapelAktif.push(m);
+      const urutanMaster=(state.db.masterMapel||[])
+        .filter(m=>String(m.Status||'Aktif').toLowerCase()==='aktif')
+        .sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999))
+        .map(m=>String(m.Nama_Mapel||'').trim()).filter(Boolean);
+      [...urutanMaster,...URUTAN_MAPEL_LEGER].forEach(m => {
+        if (semuaNilai.some(n => mapelSama(n.Mata_Pelajaran, m)) && !mapelAktif.some(x=>mapelSama(x,m))) mapelAktif.push(m);
       });
       semuaNilai.forEach(n => {
         if (n.Mata_Pelajaran && !mapelAktif.some(m => mapelSama(m, n.Mata_Pelajaran))) mapelAktif.push(n.Mata_Pelajaran);
@@ -4091,6 +4129,7 @@ function renderCatatan(container) {
       const printFilter = dataHistoris ? {ta:dataHistoris.ta, sm:dataHistoris.sm} : state.filter;
       const s = printDb.siswa.find(x => normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn));
       if (!s) return showToast('Data identitas siswa untuk cetak tidak ditemukan.', true);
+      const agamaSiswaRapor = normalisasiAgamaFront(s.Agama);
       const kls = printDb.kelas.find(x => String(x.ID_Kelas) === String(s.ID_Kelas)) || {}, p = printDb.pengaturan || {};
       
       let wkUsername = kls.Wali_Kelas_Username || '';
@@ -4124,17 +4163,27 @@ function renderCatatan(container) {
       const usernameWaliRapor = String(kls.Wali_Kelas_Username || '').trim();
 
       // Ambil nilai Intrakurikuler hanya jika mapel + kelas + periode telah disetujui.
-      const nIntraRaw = (printDb.nilaiIntra || []).filter(x =>
-        normalisasiNISNFront(x.NISN) === normalisasiNISNFront(nisn) &&
-        (x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) &&
-        (x.Semester == printFilter.sm || !x.Semester) &&
-        (!x.ID_Kelas || String(x.ID_Kelas).trim() === String(s.ID_Kelas).trim()) &&
-        statusNilaiDisetujui(x.Mata_Pelajaran, x.ID_Kelas || s.ID_Kelas, '')
-      );
+      const nIntraRaw = (printDb.nilaiIntra || []).filter(x => {
+        if (
+          normalisasiNISNFront(x.NISN) !== normalisasiNISNFront(nisn) ||
+          !(x.Tahun_Ajaran == printFilter.ta || !x.Tahun_Ajaran) ||
+          !(x.Semester == printFilter.sm || !x.Semester) ||
+          (x.ID_Kelas && String(x.ID_Kelas).trim() !== String(s.ID_Kelas).trim()) ||
+          !statusNilaiDisetujui(x.Mata_Pelajaran, x.ID_Kelas || s.ID_Kelas, '')
+        ) return false;
+        // Jangan pernah mencetak mata pelajaran agama milik agama lain.
+        const agamaMapel = agamaUntukMapelFront(x.Mata_Pelajaran);
+        return !agamaMapel || (!!agamaSiswaRapor && agamaMapel === agamaSiswaRapor);
+      });
 
-      // Urutan rapor mengikuti urutan Daftar Mata Pelajaran pada Input Nilai.
+      // Urutan rapor mengikuti master mapel, tetapi mapel agama dibatasi
+      // hanya pada agama siswa yang sedang dicetak.
       const urutanMapel = (printDb.masterMapel||[])
-        .filter(x=>String(x.Status||'Aktif').toLowerCase()==='aktif')
+        .filter(x=>{
+          if(String(x.Status||'Aktif').toLowerCase()!=='aktif') return false;
+          const agamaMapel = agamaUntukMapelFront(x.Nama_Mapel);
+          return !agamaMapel || (!!agamaSiswaRapor && agamaMapel === agamaSiswaRapor);
+        })
         .sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999))
         .map(x=>String(x.Nama_Mapel||'').trim()).filter(Boolean);
 
