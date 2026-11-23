@@ -2595,7 +2595,12 @@
       if (type === 'intra') {
         let standarMapel = (state.db.masterMapel||[])
           .filter(m=>String(m.Status||'Aktif').toLowerCase()==='aktif')
-          .sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999))
+          .sort((a,b)=>{
+          const ua=Number(a.Urutan), ub=Number(b.Urutan);
+          const na=Number.isFinite(ua)&&String(a.Urutan).trim()!==''?ua:999999;
+          const nb=Number.isFinite(ub)&&String(b.Urutan).trim()!==''?ub:999999;
+          return na-nb;
+        })
           .map(m=>({val:String(m.Nama_Mapel||''),label:String(m.Nama_Mapel||'')}))
           .filter(m=>m.val);
 
@@ -3719,44 +3724,56 @@ function renderCatatan(container) {
     // ============================================================
     // CETAK LEGER NILAI - tambahan baru, tidak mengubah modul raport
     // ============================================================
-    const URUTAN_MAPEL_LEGER = [
-      "Pendidikan Agama dan Budi Pekerti",
-      "Pendidikan Agama Islam dan Budi Pekerti",
-      "Pendidikan Agama Kristen dan Budi Pekekrti",
-      "Pendidikan Agama Hindu dan Budi Pekerti",
-      "Pendidikan Pancasila",
-      "Bahasa Indonesia",
-      "Matematika",
-      "Ilmu Pengetahuan Alam (IPA)",
-      "Ilmu Pengetahuan Sosial (IPS)",
-      "Bahasa Inggris",
-      "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)",
-      "Informatika",
-      "Seni Budaya",
-      "Prakarya",
-      "Muatan Lokal",
-      "Koding dan Kecerdasan Artifisial (KKA)"
-    ];
+    // Satu-satunya acuan urutan mapel aktif untuk seluruh cetak (rapor dan leger).
+    // Nilai Urutan dibaca sebagai angka; nilai 0 tetap sah dan urutan sama stabil.
+    function getUrutanMasterMapelAktif(db = state.db) {
+      return (db.masterMapel || [])
+        .filter(m => String(m.Status || 'Aktif').trim().toLowerCase() === 'aktif')
+        .map((m, index) => ({
+          nama: String(m.Nama_Mapel || '').trim(),
+          urutan: Number(m.Urutan),
+          index
+        }))
+        .filter(m => !!m.nama)
+        .sort((a, b) => {
+          const ua = Number.isFinite(a.urutan) && String(a.urutan) !== '' ? a.urutan : 999999;
+          const ub = Number.isFinite(b.urutan) && String(b.urutan) !== '' ? b.urutan : 999999;
+          return ua - ub || a.index - b.index;
+        })
+        .map(m => m.nama);
+    }
 
     function getNilaiIntraLeger(nisn, idKelas) {
-      const raw = (state.db.nilaiIntra || []).filter(n =>
-        String(n.NISN || '').trim() === String(nisn || '').trim() &&
-        (n.Tahun_Ajaran == state.filter.ta || !n.Tahun_Ajaran) &&
-        (n.Semester == state.filter.sm || !n.Semester) &&
-        (!n.ID_Kelas || String(n.ID_Kelas).trim() === String(idKelas || '').trim())
+      const siswa = (state.db.siswa || []).find(s =>
+        String(s.NISN || '').trim() === String(nisn || '').trim()
       );
-
-      const hasil = [];
-      URUTAN_MAPEL_LEGER.forEach(mapel => {
-        const found = raw.find(n => mapelSama(n.Mata_Pelajaran, mapel));
-        if (found) hasil.push(found);
+      const agamaSiswa = normalisasiAgamaFront(siswa && siswa.Agama);
+      const urutanMaster = getUrutanMasterMapelAktif();
+      const raw = (state.db.nilaiIntra || []).filter(n => {
+        if (
+          String(n.NISN || '').trim() !== String(nisn || '').trim() ||
+          !(n.Tahun_Ajaran == state.filter.ta || !n.Tahun_Ajaran) ||
+          !(n.Semester == state.filter.sm || !n.Semester) ||
+          (n.ID_Kelas && String(n.ID_Kelas).trim() !== String(idKelas || '').trim())
+        ) return false;
+        // Leger tidak menampilkan mapel agama generik/nonaktif atau agama siswa lain.
+        const agamaMapel = agamaUntukMapelFront(n.Mata_Pelajaran);
+        if (String(n.Mata_Pelajaran || '').trim().toLowerCase() === 'pendidikan agama dan budi pekerti') return false;
+        return !agamaMapel || (!!agamaSiswa && agamaMapel === agamaSiswa);
       });
 
-      raw.filter(n => !URUTAN_MAPEL_LEGER.some(m => mapelSama(m, n.Mata_Pelajaran)))
+      // Urutkan data nilai berdasarkan MasterMapel, bukan daftar statis lama.
+      // Data historis yang tidak lagi tercatat di MasterMapel tetap dipertahankan di akhir.
+      const hasil = [];
+      urutanMaster.forEach(mapel => {
+        const found = raw.find(n => mapelSama(n.Mata_Pelajaran, mapel));
+        if (found && !hasil.some(x => mapelSama(x.Mata_Pelajaran, found.Mata_Pelajaran))) hasil.push(found);
+      });
+      raw.filter(n => !urutanMaster.some(m => mapelSama(m, n.Mata_Pelajaran)))
+        .sort((a, b) => String(a.Mata_Pelajaran || '').localeCompare(String(b.Mata_Pelajaran || ''), 'id'))
         .forEach(n => {
           if (!hasil.some(x => mapelSama(x.Mata_Pelajaran, n.Mata_Pelajaran))) hasil.push(n);
         });
-
       return hasil;
     }
 
@@ -3919,17 +3936,18 @@ function renderCatatan(container) {
 
       // Hanya mapel yang memiliki data pada kelas yang dicetak, tetapi tetap mengikuti urutan mapel rapor.
       const semuaNilai = siswa.flatMap(s => getNilaiIntraLeger(s.NISN, s.ID_Kelas));
-      const mapelAktif = [];
-      const urutanMaster=(state.db.masterMapel||[])
-        .filter(m=>String(m.Status||'Aktif').toLowerCase()==='aktif')
-        .sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999))
-        .map(m=>String(m.Nama_Mapel||'').trim()).filter(Boolean);
-      [...urutanMaster,...URUTAN_MAPEL_LEGER].forEach(m => {
-        if (semuaNilai.some(n => mapelSama(n.Mata_Pelajaran, m)) && !mapelAktif.some(x=>mapelSama(x,m))) mapelAktif.push(m);
-      });
-      semuaNilai.forEach(n => {
-        if (n.Mata_Pelajaran && !mapelAktif.some(m => mapelSama(m, n.Mata_Pelajaran))) mapelAktif.push(n.Mata_Pelajaran);
-      });
+      const urutanMaster = getUrutanMasterMapelAktif();
+      const mapelAktif = urutanMaster.filter(m =>
+        semuaNilai.some(n => mapelSama(n.Mata_Pelajaran, m))
+      );
+      // Jaga nilai historis yang belum ada di MasterMapel; letakkan setelah mapel aktif.
+      semuaNilai
+        .map(n => String(n.Mata_Pelajaran || '').trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'id'))
+        .forEach(m => {
+          if (!mapelAktif.some(x => mapelSama(x, m))) mapelAktif.push(m);
+        });
 
       const wali = getWaliKelasLeger(kls);
       const tgl = getTanggalCetakLeger(p);
@@ -4187,7 +4205,12 @@ function renderCatatan(container) {
           const agamaMapel = agamaUntukMapelFront(x.Nama_Mapel);
           return !agamaMapel || (!!agamaSiswaRapor && agamaMapel === agamaSiswaRapor);
         })
-        .sort((a,b)=>(Number(a.Urutan)||999)-(Number(b.Urutan)||999))
+        .sort((a,b)=>{
+          const ua=Number(a.Urutan), ub=Number(b.Urutan);
+          const na=Number.isFinite(ua)&&String(a.Urutan).trim()!==''?ua:999999;
+          const nb=Number.isFinite(ub)&&String(b.Urutan).trim()!==''?ub:999999;
+          return na-nb;
+        })
         .map(x=>String(x.Nama_Mapel||'').trim()).filter(Boolean);
 
       const indexMapel = mapel => {
