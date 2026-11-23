@@ -3716,6 +3716,9 @@ function renderCatatan(container) {
           <button onclick="cetakRaportMassalKelas()" class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-2.5 rounded-xl shadow-md text-sm font-bold hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center">
             <i class="fas fa-file-alt mr-2"></i>Cetak Rapor Massal Satu Kelas
           </button>
+          <button onclick="cetakSampulMassalKelas()" class="bg-gradient-to-r from-slate-700 to-slate-900 text-white px-5 py-2.5 rounded-xl shadow-md text-sm font-bold hover:from-slate-800 hover:to-black transition-all flex items-center">
+            <i class="fas fa-book mr-2"></i>Cetak Sampul Massal Satu Kelas
+          </button>
         </div>
         <div class="mb-8 bg-amber-50 p-5 rounded-2xl border border-amber-200 text-amber-800 text-sm flex gap-4 fade-in shadow-inner">
            <div class="mt-0.5"><i class="fas fa-lightbulb text-2xl text-amber-500"></i></div>
@@ -4100,7 +4103,7 @@ function renderCatatan(container) {
       tampilkanCetakLeger(html);
     }
 
-    async function cetakSampul(nisn) {
+    async function cetakSampul(nisn, opsiCetak = {}) {
       try { await refreshPrintDataFromFirestore({ nisn: String(nisn) }); }
       catch (error) { showToast('Data cetak gagal dimuat dari Firestore: ' + (error.message || error), true); return; }
       const s = state.db.siswa.find(x => x.NISN == nisn), p = state.db.pengaturan || {};
@@ -4178,8 +4181,77 @@ function renderCatatan(container) {
           </table>
         </div>
       `;
+      // Mode pengumpulan HTML dipakai oleh cetak sampul massal agar hanya
+      // satu dialog cetak dibuka setelah seluruh sampul berhasil disiapkan.
+      if (opsiCetak && opsiCetak.kembalikanHTML === true) return printHTML;
+
       const pa = document.getElementById('print-area'); pa.innerHTML = printHTML; pa.classList.remove('hidden'); 
       setTimeout(() => { window.print(); setTimeout(() => { pa.classList.add('hidden'); pa.innerHTML = ''; }, 3000); }, 500);
+    }
+
+    // Cetak sampul depan dan identitas seluruh siswa pada satu kelas.
+    // Format setiap siswa tetap menggunakan template cetakSampul() yang lama.
+    async function cetakSampulMassalKelas() {
+      const selectKelas = document.getElementById('filter-kelas-cetak');
+      const kelasVal = selectKelas ? String(selectKelas.value || '').trim() : '';
+      if (!kelasVal || kelasVal === 'all') {
+        await appAlert('Pilih satu kelas terlebih dahulu. Cetak sampul massal tidak berlaku untuk Semua Kelas.', { title: 'Pilih Kelas' });
+        return;
+      }
+
+      const kelas = (state.db.kelas || []).find(k => String(k.ID_Kelas) === kelasVal);
+      if (!kelas) {
+        await appAlert('Data kelas tidak ditemukan. Muat ulang data aplikasi.', { title: 'Kelas Tidak Ditemukan' });
+        return;
+      }
+
+      const daftarSiswa = (state.db.siswa || [])
+        .filter(s => String(s.ID_Kelas || '').trim() === kelasVal)
+        .slice()
+        .sort((a, b) => String(a.Nama_Lengkap || '').localeCompare(String(b.Nama_Lengkap || ''), 'id'));
+
+      if (!daftarSiswa.length) {
+        await appAlert('Tidak ada siswa pada kelas yang dipilih.', { title: 'Data Siswa Kosong' });
+        return;
+      }
+
+      const setuju = await appConfirm(
+        `Cetak sampul untuk ${daftarSiswa.length} siswa kelas ${kelas.Nama_Kelas || kelas.ID_Kelas}?\\nSetiap siswa mendapatkan dua halaman: sampul depan dan identitas peserta didik.`,
+        { title: 'Konfirmasi Cetak Sampul Massal' }
+      );
+      if (!setuju) return;
+
+      const daftarHTML = [];
+      try {
+        for (let i = 0; i < daftarSiswa.length; i++) {
+          const siswa = daftarSiswa[i];
+          showLoading(true, `Menyiapkan sampul ${i + 1}/${daftarSiswa.length}: ${siswa.Nama_Lengkap || siswa.NISN}`);
+          const html = await cetakSampul(siswa.NISN, { kembalikanHTML: true });
+          if (typeof html !== 'string' || !html.trim()) {
+            throw new Error(`Sampul ${siswa.Nama_Lengkap || siswa.NISN} gagal disiapkan. Proses dihentikan.`);
+          }
+          daftarHTML.push(html);
+        }
+
+        const areaCetak = document.getElementById('print-area');
+        if (!areaCetak) throw new Error('Area cetak tidak ditemukan. Muat ulang aplikasi.');
+        areaCetak.innerHTML = daftarHTML.map((html, index) =>
+          `${index ? '<div style="display:block;height:0;page-break-before:always;break-before:page;"></div>' : ''}${html}`
+        ).join('');
+        areaCetak.classList.remove('hidden');
+
+        showLoading(false);
+        setTimeout(() => {
+          window.print();
+          setTimeout(() => {
+            areaCetak.classList.add('hidden');
+            areaCetak.innerHTML = '';
+          }, 5000);
+        }, 500);
+      } catch (error) {
+        showLoading(false);
+        await appAlert(error.message || String(error), { title: 'Cetak Sampul Massal Dibatalkan' });
+      }
     }
 
     async function cetakRaport(nisn, dataHistoris = null, opsiCetak = {}) {
