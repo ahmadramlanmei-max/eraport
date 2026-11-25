@@ -2636,9 +2636,24 @@
           availableClasses.some(k => String(k.ID_Kelas || '') === String(x.ID_Kelas || ''))
         );
         if (pemetaanIntraAktif.length) {
-          const mapelTerpetakan = [...new Set(pemetaanIntraAktif.map(x => String(x.Mata_Pelajaran || '').trim()).filter(Boolean))];
+          const mapelTerpetakan = [...new Set(
+            pemetaanIntraAktif
+              .map(x => String(x.Mata_Pelajaran || '').trim())
+              .filter(Boolean)
+          )];
+
+          // Admin melihat seluruh mapel yang dipetakan.
+          // Akun non-admin hanya melihat mapel yang tercantum dalam penugasan
+          // Mapel_Diampu/Kelas_Diampu miliknya, agar daftar pemetaan tidak
+          // menimpa pembatasan mapel guru yang sudah dibuat sebelumnya.
+          const mapelDiizinkan = role === 'admin'
+            ? mapelTerpetakan
+            : mapelTerpetakan.filter(m =>
+                getMapelDiampuGuru().some(tugas => mapelSama(tugas, m))
+              );
+
           opsiMapel = '<option value="">-- Pilih Mata Pelajaran --</option>' +
-            mapelTerpetakan.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+            mapelDiizinkan.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
         }
 
         rows = siswaBolehDinilai.map((s, i) => `
