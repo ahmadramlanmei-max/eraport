@@ -1096,7 +1096,7 @@
         return;
       }
       const kelas = state.db.kelas || [];
-      const siswa = state.db.siswa || [];
+      const siswa = urutkanSiswaAbjad(state.db.siswa || []);
       const ta = String(state.filter.ta || '');
       const sm = String(state.filter.sm || '');
       const opsiKelas = '<option value="">-- Pilih Kelas --</option>' + kelas.map(k=>`<option value="${escapeHtml(k.ID_Kelas)}">${escapeHtml(k.Nama_Kelas || k.ID_Kelas)}</option>`).join('');
@@ -1231,7 +1231,7 @@
       const id=document.getElementById('map-grup-kelas')?.value;
       const box=document.getElementById('map-grup-anggota');
       if(!box) return;
-      const daftar=(state.db.siswa||[]).filter(s=>String(s.ID_Kelas)===String(id));
+      const daftar=urutkanSiswaAbjad((state.db.siswa||[]).filter(s=>String(s.ID_Kelas)===String(id)));
       box.innerHTML=daftar.length?daftar.map(s=>`<label class="flex items-center gap-2 p-2 rounded hover:bg-slate-50"><input type="checkbox" class="map-grup-check" value="${escapeHtml(s.NISN)}"><span>${escapeHtml(s.Nama_Lengkap)} <small class="text-slate-400">${escapeHtml(s.NISN)}</small></span></label>`).join(''):'<span class="text-slate-400">Tidak ada siswa pada kelas ini.</span>';
     }
 
@@ -1239,7 +1239,7 @@
       const id=document.getElementById('map-ekstra-kelas')?.value;
       const el=document.getElementById('map-ekstra-siswa');
       if(!el) return;
-      const daftar=(state.db.siswa||[]).filter(s=>String(s.ID_Kelas)===String(id));
+      const daftar=urutkanSiswaAbjad((state.db.siswa||[]).filter(s=>String(s.ID_Kelas)===String(id)));
       el.innerHTML='<option value="">-- Pilih Siswa --</option>'+daftar.map(s=>`<option value="${escapeHtml(s.NISN)}">${escapeHtml(s.Nama_Lengkap)} (${escapeHtml(s.NISN)})</option>`).join('');
     }
 
@@ -1636,7 +1636,7 @@
       if(!state.db.siswa) state.db.siswa = [];
       // Data alumni tetap berada di sheet Siswa; pemisahan hanya pada tampilan.
       // Format kelas alumni mengikuti proses rollover: "ALUMNI <tahun ajaran>".
-      const semuaSiswa = state.db.siswa;
+      const semuaSiswa = urutkanSiswaAbjad(state.db.siswa);
       const isAlumni = s => /^ALUMNI\b/i.test(String(s.ID_Kelas || '').trim());
       const siswaAktif = semuaSiswa.filter(s => !isAlumni(s));
       const siswaAlumni = semuaSiswa.filter(isAlumni);
@@ -1799,7 +1799,7 @@
     }
 
     function renderKehadiran(container) {
-      const rows = state.db.siswa.map((s, i) => {
+      const rows = urutkanSiswaAbjad(state.db.siswa).map((s, i) => {
         const dataLama = (state.db.kehadiran || []).filter(k =>
           String(k.NISN).trim() === String(s.NISN).trim() &&
           (String(k.Tahun_Ajaran || '').trim() === String(state.filter.ta || '').trim() || !k.Tahun_Ajaran) &&
@@ -2401,7 +2401,7 @@
       }
 
       // Tentukan siswa berdasarkan Filter Kelas yang dipilih.
-      const siswaTemplate = (state.db.siswa || []).filter(s => {
+      const siswaTemplate = urutkanSiswaAbjad((state.db.siswa || []).filter(s => {
         const idKelasSiswa = String(s.ID_Kelas || '').trim();
 
         if (filterKelas !== 'all' && filterKelas !== '') {
@@ -2422,7 +2422,7 @@
         return kelasTersedia.some(k =>
           String(k.ID_Kelas || '').trim() === idKelasSiswa
         );
-      });
+      }));
 
       if (!siswaTemplate.length) {
         showToast('Tidak ada peserta didik pada Filter Kelas yang dipilih.', true);
@@ -2591,9 +2591,9 @@
         opsiKelasFilter += '<option value="" disabled>Tidak ada kelas</option>';
       }
       
-      const siswaBolehDinilai = role !== 'admin'
+      const siswaBolehDinilai = urutkanSiswaAbjad(role !== 'admin'
         ? (state.db.siswa || []).filter(s => availableClasses.some(k => String(k.ID_Kelas || '').trim() === String(s.ID_Kelas || '').trim()))
-        : (state.db.siswa || []);
+        : (state.db.siswa || []));
 
       if (type === 'intra') {
         let standarMapel = (state.db.masterMapel||[])
@@ -3128,6 +3128,18 @@
     }
 
     
+    // Mengurutkan salinan daftar siswa berdasarkan Nama_Lengkap (A-Z),
+    // tanpa mengubah urutan atau isi data asli di Firestore.
+    function urutkanSiswaAbjad(daftar) {
+      return (Array.isArray(daftar) ? daftar : []).slice().sort((a, b) =>
+        String(a && a.Nama_Lengkap || '').trim().localeCompare(
+          String(b && b.Nama_Lengkap || '').trim(),
+          'id',
+          { sensitivity: 'base', numeric: true }
+        )
+      );
+    }
+
     function normalisasiNISNFront(value) {
       const digit = String(value == null ? '' : value).replace(/\D/g, '');
       return digit ? digit.padStart(10, '0') : '';
@@ -3706,7 +3718,7 @@ function renderCatatan(container) {
         opsiKelasFilter += '<option value="" disabled>Tidak ada kelas</option>';
       }
 
-      let cards = state.db.siswa.map(s => `
+      let cards = urutkanSiswaAbjad(state.db.siswa).map(s => `
         <div class="kartu-siswa-cetak bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between md:items-center gap-5 hover:shadow-md transition-all group" data-kelas="${s.ID_Kelas}">
            <div>
               <p class="font-extrabold text-lg text-slate-800 group-hover:text-blue-600 transition-colors">${s.Nama_Lengkap}</p>
@@ -3773,7 +3785,7 @@ function renderCatatan(container) {
       const daftarSiswa = (state.db.siswa || [])
         .filter(s => String(s.ID_Kelas || '').trim() === kelasVal)
         .slice()
-        .sort((a, b) => String(a.Nama_Lengkap || '').localeCompare(String(b.Nama_Lengkap || ''), 'id'));
+        .sort((a, b) => String(a.Nama_Lengkap || '').trim().localeCompare(String(b.Nama_Lengkap || '').trim(), 'id', { sensitivity: 'base', numeric: true }));
 
       if (!daftarSiswa.length) {
         await appAlert('Tidak ada siswa pada kelas yang dipilih.', { title: 'Data Siswa Kosong' });
@@ -4044,7 +4056,7 @@ function renderCatatan(container) {
       const daftarSiswa = (state.db.siswa || [])
         .filter(s => String(s.ID_Kelas || '').trim() === kelasVal)
         .slice()
-        .sort((a, b) => String(a.Nama_Lengkap || '').localeCompare(String(b.Nama_Lengkap || ''), 'id'));
+        .sort((a, b) => String(a.Nama_Lengkap || '').trim().localeCompare(String(b.Nama_Lengkap || '').trim(), 'id', { sensitivity: 'base', numeric: true }));
 
       if (!daftarSiswa.length) {
         await appAlert('Tidak ada siswa pada kelas yang dipilih.', { title: 'Data Siswa Kosong' });
@@ -4093,7 +4105,7 @@ function renderCatatan(container) {
       const p = state.db.pengaturan || {};
       const siswa = (state.db.siswa || [])
         .filter(s => String(s.ID_Kelas) === String(kelasVal))
-        .sort((a,b) => String(a.Nama_Lengkap || '').localeCompare(String(b.Nama_Lengkap || ''), 'id'));
+        .sort((a,b) => String(a.Nama_Lengkap || '').trim().localeCompare(String(b.Nama_Lengkap || '').trim(), 'id', { sensitivity: 'base', numeric: true }));
 
       if (!siswa.length) return showToast('Belum ada siswa pada kelas tersebut.', true);
 
@@ -4284,7 +4296,7 @@ function renderCatatan(container) {
       const daftarSiswa = (state.db.siswa || [])
         .filter(s => String(s.ID_Kelas || '').trim() === kelasVal)
         .slice()
-        .sort((a, b) => String(a.Nama_Lengkap || '').localeCompare(String(b.Nama_Lengkap || ''), 'id'));
+        .sort((a, b) => String(a.Nama_Lengkap || '').trim().localeCompare(String(b.Nama_Lengkap || '').trim(), 'id', { sensitivity: 'base', numeric: true }));
 
       if (!daftarSiswa.length) {
         await appAlert('Tidak ada siswa pada kelas yang dipilih.', { title: 'Data Siswa Kosong' });
