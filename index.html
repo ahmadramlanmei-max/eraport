@@ -1049,6 +1049,7 @@
     function ubahFilterGlobal() {
       state.filter.ta = document.getElementById('global-ta').value;
       state.filter.sm = document.getElementById('global-sm').value;
+      nomorPermintaanMasterTP++;
       
       const mapelEl = document.getElementById('input-mapel');
       if(mapelEl) mapelEl.value = '';
@@ -2013,6 +2014,63 @@
     }
 
     let modeTPPenerapan = 'semua';
+    let nomorPermintaanMasterTP = 0;
+
+    // Selalu baca MasterTP langsung dari Spreadsheet ketika kelas/mapel dipilih.
+    // Ini mencegah daftar TP bergantung pada cache browser atau data nilai siswa.
+    function muatMasterTPDariServer(mapelValue, kelasId) {
+      const requestId = ++nomorPermintaanMasterTP;
+      const ta = String(state.filter.ta || '').trim();
+      const sm = String(state.filter.sm || '').trim();
+      const mapel = String(mapelValue || '').trim();
+      const kelas = String(kelasId || '').trim();
+      if (!mapel || !kelas || kelas === 'all') return;
+
+      const payload = {Tahun_Ajaran:ta, Semester:sm, ID_Kelas:kelas, Mata_Pelajaran:mapel};
+      google.script.run.withSuccessHandler(res => {
+        // Abaikan respons lama jika pengguna sudah mengganti filter.
+        if (requestId !== nomorPermintaanMasterTP) return;
+        const kelasSekarang = String(document.getElementById('filter-kelas-nilai')?.value || '').trim();
+        const mapelSekarang = String(document.getElementById('input-mapel')?.value || '').trim();
+        if (kelasSekarang !== kelas || mapelSekarang.toLowerCase() !== mapel.toLowerCase() ||
+            String(state.filter.ta || '').trim() !== ta || String(state.filter.sm || '').trim() !== sm) return;
+
+        if (!res || !res.success) {
+          console.error('Gagal membaca MasterTP:', res && res.message);
+          const info = document.getElementById('tp-mode-info');
+          if (info) info.textContent = (res && res.message) || 'Daftar TP gagal dibaca dari server.';
+          return;
+        }
+
+        const data = res.found && res.data ? res.data : null;
+        for (let i = 1; i <= 10; i++) {
+          const input = document.getElementById('master-tp-' + i);
+          if (input) input.value = data ? String(data['TP' + i] || '').slice(0, 100) : '';
+          hitungSisaTP(i);
+        }
+
+        // Perbarui cache hanya setelah server mengonfirmasi data yang sebenarnya.
+        state.db.masterTP = state.db.masterTP || [];
+        state.db.masterTP = state.db.masterTP.filter(x => !(
+          String(x.Tahun_Ajaran || '').trim() === ta &&
+          String(x.Semester || '').trim().toLowerCase() === sm.toLowerCase() &&
+          String(x.ID_Kelas || '').trim().toLowerCase() === kelas.toLowerCase() &&
+          String(x.Mata_Pelajaran || '').trim().toLowerCase() === mapel.toLowerCase()
+        ));
+        if (data) state.db.masterTP.push(data);
+
+        const info = document.getElementById('tp-mode-info');
+        if (info) info.textContent = data
+          ? 'Daftar TP berhasil dimuat dari MasterTP untuk kelas ini.'
+          : 'Belum ada daftar TP tersimpan untuk kelas dan mata pelajaran ini.';
+        renderPilihanTPGlobal();
+      }).withFailureHandler(err => {
+        if (requestId !== nomorPermintaanMasterTP) return;
+        console.error('Kesalahan membaca MasterTP:', err);
+        const info = document.getElementById('tp-mode-info');
+        if (info) info.textContent = 'Gagal menghubungi server untuk membaca daftar TP.';
+      }).getMasterTPRecord(payload, state.user && state.user.username);
+    }
     function hitungSisaTP(n) {
       const el=document.getElementById(`master-tp-${n}`), sisa=document.getElementById(`sisa-tp-${n}`);
       if(el&&sisa) sisa.innerText=100-el.value.length;
@@ -2147,65 +2205,18 @@
             const info=document.getElementById('tp-mode-info');
             if(info) info.textContent='Pilih satu kelas untuk memuat dan mengatur daftar TP. Setiap kelas memiliki daftar TP tersendiri.';
           } else {
-            // Baca langsung dari sheet MasterTP setiap kali kelas/mapel dipilih.
-            // Ini memastikan TP tetap muncul walaupun belum ada nilai siswa tersimpan.
-            const requestId=window.__masterTPRequestId=(window.__masterTPRequestId||0)+1;
-            const taCari=String(state.filter.ta||''), smCari=String(state.filter.sm||'');
-            const kelasCari=filterKelasAktif, mapelCari=String(mapelValue||'').trim();
-            const isiTP=(record)=>{
-              if(requestId!==window.__masterTPRequestId) return;
-              const kelasSekarang=String(document.getElementById('filter-kelas-nilai')?.value||'all').trim();
-              const mapelSekarang=String(document.getElementById('input-mapel')?.value||'').trim();
-              if(kelasSekarang!==kelasCari || mapelSekarang.toLowerCase()!==mapelCari.toLowerCase() ||
-                 String(state.filter.ta||'')!==taCari || String(state.filter.sm||'')!==smCari) return;
-              if(record){
-                for(let i=1;i<=10;i++){
-                  const master=document.getElementById(`master-tp-${i}`);
-                  if(master) master.value=String(record[`TP${i}`]||'').slice(0,100);
-                  hitungSisaTP(i);
-                }
-                renderPilihanTPGlobal();
-              }
-              const info=document.getElementById('tp-mode-info');
-              if(info) info.textContent=record
-                ? 'Daftar TP dimuat dari MasterTP. Daftar ini tetap tersedia meskipun nilai siswa belum diisi.'
-                : 'Belum ada daftar TP tersimpan untuk kombinasi kelas, mata pelajaran, tahun ajaran, dan semester ini.';
-            };
-            google.script.run.withSuccessHandler(res=>{
-              if(res&&res.success){
-                const record=res.data||null;
-                // Perbarui cache lokal agar data tetap tersedia pada pemakaian berikutnya.
-                if(record){
-                  state.db.masterTP=state.db.masterTP||[];
-                  state.db.masterTP=state.db.masterTP.filter(x=>
-                    !(String(x.Tahun_Ajaran||'').trim()===taCari &&
-                      String(x.Semester||'').trim().toLowerCase()===smCari.toLowerCase() &&
-                      String(x.ID_Kelas||'').trim().toLowerCase()===kelasCari.toLowerCase() &&
-                      String(x.Mata_Pelajaran||'').trim().toLowerCase()===mapelCari.toLowerCase()));
-                  state.db.masterTP.push(record);
-                  isiTP(record);
-                } else {
-                  // Kompatibilitas data lama saja; sumber utama tetap MasterTP.
-                  const kelasSiswaByNisn=new Map((state.db.siswa||[]).map(s=>[String(s.NISN||'').trim(),String(s.ID_Kelas||'').trim()]));
-                  const legacy=(state.db.nilaiIntra||[]).find(n=>{
-                    const idKelas=kelasSiswaByNisn.get(String(n.NISN||'').trim())||'';
-                    return idKelas===kelasCari &&
-                      (String(n.Tahun_Ajaran||'')===taCari||!String(n.Tahun_Ajaran||'').trim()) &&
-                      (String(n.Semester||'')===smCari||!String(n.Semester||'').trim()) &&
-                      String(n.Mata_Pelajaran||'').trim().toLowerCase()===mapelCari.toLowerCase() &&
-                      Array.from({length:10},(_,i)=>String(n['TP'+(i+1)]||'').trim()).some(Boolean);
-                  });
-                  isiTP(legacy);
-                }
-              } else {
-                const info=document.getElementById('tp-mode-info');
-                if(info) info.textContent=(res&&res.message)||'Gagal membaca daftar TP dari MasterTP.';
-              }
-            }).withFailureHandler(err=>{
-              if(requestId!==window.__masterTPRequestId) return;
-              const info=document.getElementById('tp-mode-info');
-              if(info) info.textContent='Gagal membaca MasterTP: '+((err&&err.message)||'Kesalahan server.');
-            }).getMasterTPRecord(taCari,smCari,kelasCari,mapelCari);
+            let masterTP=(state.db.masterTP||[]).find(n=>String(n.Tahun_Ajaran||'')===String(state.filter.ta||'')&&String(n.Semester||'')===String(state.filter.sm||'')&&String(n.ID_Kelas||'')===filterKelasAktif&&String(n.Mata_Pelajaran||'').trim().toLowerCase()===String(mapelValue).trim().toLowerCase());
+            // Kompatibilitas: jika master belum pernah disimpan, ambil TP lama dari NilaiIntra untuk kelas yang tepat.
+            if(!masterTP){
+              const kelasSiswaByNisn=new Map((state.db.siswa||[]).map(s=>[String(s.NISN||'').trim(),String(s.ID_Kelas||'').trim()]));
+              masterTP=(state.db.nilaiIntra||[]).find(n=>{
+                const idKelas=kelasSiswaByNisn.get(String(n.NISN||'').trim())||'';
+                return idKelas===filterKelasAktif && (String(n.Tahun_Ajaran||'')===String(state.filter.ta||'')||!String(n.Tahun_Ajaran||'').trim()) && (String(n.Semester||'')===String(state.filter.sm||'')||!String(n.Semester||'').trim()) && String(n.Mata_Pelajaran||'').trim().toLowerCase()===String(mapelValue).trim().toLowerCase() && Array.from({length:10},(_,i)=>String(n['TP'+(i+1)]||'').trim()).some(Boolean);
+              });
+            }
+            if(masterTP){for(let i=1;i<=10;i++){const master=document.getElementById(`master-tp-${i}`);if(master)master.value=String(masterTP[`TP${i}`]||'').slice(0,100);hitungSisaTP(i);}}
+            const info=document.getElementById('tp-mode-info');
+            if(info) info.textContent='Daftar TP tersimpan untuk kelas ini. Pilih mode penerapan yang diinginkan.';
           }
         }
 
@@ -2288,6 +2299,10 @@
           }
         });
         renderPilihanTPGlobal();
+        // Data TP dibaca ulang dari Spreadsheet setelah filter kelas/mapel final.
+        if (filterKelasAktif !== 'all' && mapelValue) {
+          muatMasterTPDariServer(mapelValue, filterKelasAktif);
+        }
     }
 
 
