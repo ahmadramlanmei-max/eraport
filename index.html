@@ -334,10 +334,42 @@
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-    /* Glassmorphism utilities */
+    /* Glassmorphism khusus halaman login */
     .glass {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.14);
+      -webkit-backdrop-filter: blur(22px) saturate(160%);
+      backdrop-filter: blur(22px) saturate(160%);
+      border: 1px solid rgba(255,255,255,.32);
+      box-shadow: 0 24px 80px rgba(2, 12, 40, .34), inset 0 1px 0 rgba(255,255,255,.28);
+    }
+    #login-screen {
+      isolation: isolate;
+      background: radial-gradient(ellipse at 15% 15%, rgba(37,99,235,.45), transparent 42%),
+                  radial-gradient(ellipse at 85% 80%, rgba(124,58,237,.38), transparent 42%),
+                  linear-gradient(135deg, #07152f 0%, #102b55 48%, #111b3e 100%);
+    }
+    #login-screen::before, #login-screen::after {
+      content: ""; position: absolute; border-radius: 9999px; pointer-events: none; z-index: -1;
+      filter: blur(2px); animation: loginFloat 12s ease-in-out infinite alternate;
+    }
+    #login-screen::before { width: 340px; height: 340px; left: -90px; bottom: -110px; background: rgba(14,165,233,.22); }
+    #login-screen::after { width: 420px; height: 420px; right: -130px; top: -150px; background: rgba(139,92,246,.24); animation-delay: -5s; }
+    @keyframes loginFloat { from { transform: translate3d(0,0,0) scale(1); } to { transform: translate3d(24px,-20px,0) scale(1.08); } }
+    .login-orb { background: linear-gradient(135deg,rgba(96,165,250,.34),rgba(129,140,248,.18)); border:1px solid rgba(255,255,255,.35); box-shadow:0 12px 35px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.35); }
+    .login-title { color:#fff; text-shadow:0 2px 18px rgba(0,0,0,.2); }
+    .login-subtitle { color:rgba(219,234,254,.96); }
+    .login-caption { color:rgba(203,213,225,.82); }
+    .login-label { color:rgba(239,246,255,.96); }
+    .login-field { background:rgba(8,20,45,.28)!important; border:1px solid rgba(219,234,254,.28)!important; color:#fff!important; box-shadow:inset 0 1px 3px rgba(0,0,0,.12); }
+    .login-field::placeholder { color:rgba(219,234,254,.55); }
+    .login-field:focus { background:rgba(8,20,45,.42)!important; border-color:rgba(147,197,253,.9)!important; box-shadow:0 0 0 4px rgba(96,165,250,.18)!important; }
+    .login-icon { color:rgba(191,219,254,.8); }
+    .login-submit { background:linear-gradient(110deg,#2563eb,#4f46e5 55%,#7c3aed); box-shadow:0 12px 28px rgba(37,99,235,.35),inset 0 1px 0 rgba(255,255,255,.25); }
+    .login-submit:hover { filter:brightness(1.1); box-shadow:0 16px 34px rgba(79,70,229,.42); }
+    #login-error { color:#fecaca!important; background:rgba(127,29,29,.28)!important; border-color:rgba(252,165,165,.3)!important; }
+    @media(max-width:640px) {
+      .glass { padding:1.65rem!important; border-radius:1.5rem!important; }
+      #login-screen { padding:1.1rem!important; }
     }
 
 
@@ -400,37 +432,40 @@
   </div>
 
   <!-- Login Screen -->
-  <div id="login-screen" class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-100 p-4 relative overflow-hidden">
-    <div class="absolute top-0 left-0 w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-    <div class="absolute top-0 right-0 w-96 h-96 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-    
-    <div class="glass p-8 rounded-2xl shadow-2xl w-full max-w-md border border-white/50 relative z-10">
+  <div id="login-screen" class="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div class="absolute top-8 left-8 w-64 h-64 bg-cyan-400 rounded-full mix-blend-screen filter blur-3xl opacity-20 pointer-events-none"></div>
+    <div class="absolute bottom-0 right-8 w-80 h-80 bg-violet-500 rounded-full mix-blend-screen filter blur-3xl opacity-20 pointer-events-none"></div>
+
+    <div class="glass p-9 rounded-[2rem] w-full max-w-md relative z-10">
       <div class="text-center mb-8">
-        <div class="bg-gradient-to-tr from-blue-800 to-blue-600 text-white w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-xl transform rotate-3">
+        <div class="login-orb text-white w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-5 transform rotate-3">
           <i class="fas fa-shield-alt text-4xl -rotate-3"></i>
         </div>
-        <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">E-Raport KM</h1>
-        <p class="text-sm text-blue-600 font-bold mt-2 uppercase tracking-wide">Aplikasi Raport Kurikulum Merdeka<br>SMP NEGERI 3 BUKIT RAYA</p>
-        <p class="text-xs text-slate-500 font-medium mt-1">Sistem Penilaian Akademik Terpadu<br>Desain Ahmad Ramlan</p>
+        <h1 class="login-title text-3xl font-extrabold tracking-tight">E-Raport KM</h1>
+        <p class="login-subtitle text-sm font-bold mt-2 uppercase tracking-wide">Aplikasi Raport Kurikulum Merdeka<br>SMP NEGERI 3 BUKIT RAYA</p>
+        <p class="login-caption text-xs font-medium mt-2">Sistem Penilaian Akademik Terpadu<br>Desain Ahmad Ramlan</p>
       </div>
       <form onsubmit="handleLogin(event)" class="space-y-5">
         <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Username</label>
+          <label class="login-label block text-sm font-semibold mb-2">Username</label>
           <div class="relative">
-            <i class="fas fa-user absolute left-4 top-3.5 text-slate-400"></i>
-            <input type="text" id="username" required class="w-full border border-slate-300 rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white/50 focus:bg-white text-slate-700 font-medium">
+            <i class="fas fa-user login-icon absolute left-4 top-3.5"></i>
+            <input type="text" id="username" required autocomplete="username" placeholder="Masukkan username" class="login-field w-full rounded-xl pl-11 pr-4 py-3 outline-none transition-all font-medium">
           </div>
         </div>
         <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
+          <label class="login-label block text-sm font-semibold mb-2">Password</label>
           <div class="relative">
-            <i class="fas fa-lock absolute left-4 top-3.5 text-slate-400"></i>
-            <input type="password" id="password" required class="w-full border border-slate-300 rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white/50 focus:bg-white text-slate-700 font-medium">
+            <i class="fas fa-lock login-icon absolute left-4 top-3.5"></i>
+            <input type="password" id="password" required autocomplete="current-password" placeholder="Masukkan password" class="login-field w-full rounded-xl pl-11 pr-4 py-3 outline-none transition-all font-medium">
           </div>
         </div>
-        <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-700 hover:to-red-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-500/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0">Masuk Aplikasi</button>
-        <p id="login-error" class="text-blue-500 text-sm text-center hidden mt-3 bg-blue-50 py-2.5 rounded-lg border border-blue-100 font-medium"></p>
+        <button type="submit" class="login-submit w-full text-white font-bold py-3.5 rounded-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0"> <i class="fas fa-right-to-bracket mr-2"></i>Masuk Aplikasi</button>
+        <p id="login-error" class="text-sm text-center hidden mt-3 py-2.5 rounded-lg border font-medium"></p>
       </form>
+      <div class="mt-7 pt-5 border-t border-white/15 text-center">
+        <p class="text-[10px] tracking-[.22em] uppercase text-blue-100/55">Portal Akademik Terpadu</p>
+      </div>
     </div>
   </div>
 
